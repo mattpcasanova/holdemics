@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holdemics — Game Table</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Bricolage+Grotesque:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body { margin: 0; padding: 24px; background: #0E1013; font-family: 'Inter', system-ui, sans-serif; }
+.holdemics-mockup { max-width: 1080px; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<div class="holdemics-mockup">
+<div style="background: #1A1D21; border-radius: 12px; padding: 0; font-family: 'Inter', system-ui, sans-serif; color: #E8EAED; overflow: hidden; border: 0.5px solid #2D333B;">
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #14171A; border-bottom: 0.5px solid #2D333B;">
+  <div style="display: flex; align-items: center; gap: 14px;">
+    <div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+      <div style="width: 16px; height: 16px; border-radius: 3px; background: #1F6F4A; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: #E5B96A;">♠</div>
+      <span>holdemics</span>
+    </div>
+    <div style="font-size: 11px; color: #9AA0A6;">Standard · Hand #847 · Orbit 4</div>
+  </div>
+  <div style="display: flex; gap: 14px; font-size: 11px; color: #9AA0A6;">
+    <span>Blinds <span style="color: #E8EAED;">2/4</span> <span style="color: #6B7178;">→ 3/6 in 5</span></span>
+    <span>Pot <span style="color: #E5B96A; font-weight: 500;">68</span></span>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 200px; gap: 0;">
+
+<div style="background: #1A1D21; padding: 24px 16px; min-height: 560px; position: relative;">
+
+<div style="position: relative; width: 100%; height: 500px; background: radial-gradient(ellipse at center, #1F6F4A 0%, #155637 70%, #0F4029 100%); border-radius: 220px / 150px; border: 6px solid #14171A; box-shadow: inset 0 0 0 1px rgba(229,185,106,0.2);">
+
+<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px;">
+
+<div style="position: relative; width: 64px; height: 90px;">
+  <div style="position: absolute; top: 6px; left: 6px; width: 56px; height: 78px; background: #0F4029; border: 0.5px solid #2D333B; border-radius: 5px;"></div>
+  <div style="position: absolute; top: 3px; left: 3px; width: 56px; height: 78px; background: #14171A; border: 0.5px solid #1F6F4A; border-radius: 5px;"></div>
+  <div style="position: absolute; top: 0; left: 0; width: 56px; height: 78px; background: #14171A; border: 0.5px solid #E5B96A; border-radius: 5px; padding: 4px; box-sizing: border-box;">
+    <div style="width: 100%; height: 100%; border: 0.5px solid rgba(229,185,106,0.3); border-radius: 3px; background: repeating-linear-gradient(45deg, #1F6F4A, #1F6F4A 3px, #155637 3px, #155637 6px); position: relative;">
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 22px; height: 22px; border-radius: 50%; background: #14171A; border: 0.5px solid #E5B96A; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #E5B96A;">♠</div>
+    </div>
+  </div>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+  <div style="font-size: 9px; color: #9FCFB6; letter-spacing: 0.08em;">POT</div>
+  <div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px; font-weight: 500; color: #E5B96A; letter-spacing: -0.02em; line-height: 1;">68</div>
+</div>
+
+<svg width="160" height="64" viewBox="0 0 160 64" style="margin-top: -2px;">
+  <ellipse cx="50" cy="56" rx="14" ry="3.5" fill="#0F4029" opacity="0.5"/>
+  <g transform="translate(50, 56)">
+    <ellipse cx="0" cy="-2" rx="13" ry="3.5" fill="#C84B4B" stroke="#7A2828" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-5" rx="13" ry="3.5" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-8" rx="13" ry="3.5" fill="#C84B4B" stroke="#7A2828" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-11" rx="13" ry="3.5" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-14" rx="13" ry="3.5" fill="#C84B4B" stroke="#7A2828" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-17" rx="13" ry="3.5" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-20" rx="13" ry="3.5" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-23" rx="13" ry="3.5" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+  </g>
+
+  <ellipse cx="80" cy="58" rx="16" ry="4" fill="#0F4029" opacity="0.5"/>
+  <g transform="translate(80, 58)">
+    <ellipse cx="0" cy="-2" rx="14" ry="4" fill="#E5B96A" stroke="#8A6E2E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-6" rx="14" ry="4" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-10" rx="14" ry="4" fill="#E5B96A" stroke="#8A6E2E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-14" rx="14" ry="4" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-18" rx="14" ry="4" fill="#E5B96A" stroke="#8A6E2E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-22" rx="14" ry="4" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-26" rx="14" ry="4" fill="#E5B96A" stroke="#8A6E2E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-30" rx="14" ry="4" fill="#E5B96A" stroke="#8A6E2E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-34" rx="14" ry="4" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-38" rx="14" ry="4" fill="#E5B96A" stroke="#8A6E2E" stroke-width="0.5"/>
+  </g>
+
+  <ellipse cx="115" cy="56" rx="13" ry="3.5" fill="#0F4029" opacity="0.5"/>
+  <g transform="translate(115, 56)">
+    <ellipse cx="0" cy="-2" rx="11" ry="3.5" fill="#1F6F4A" stroke="#0A2E1F" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-5" rx="11" ry="3.5" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-8" rx="11" ry="3.5" fill="#1F6F4A" stroke="#0A2E1F" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-11" rx="11" ry="3.5" fill="#1A1D21" stroke="#0A0C0E" stroke-width="0.5"/>
+    <ellipse cx="0" cy="-14" rx="11" ry="3.5" fill="#1F6F4A" stroke="#0A2E1F" stroke-width="0.5"/>
+  </g>
+</svg>
+
+<div style="font-size: 9px; color: #6FA68A; margin-top: -6px;">flop</div>
+
+</div>
+
+<div style="position: absolute; top: 22%; left: 50%; transform: translateX(-50%); display: flex; gap: 6px;">
+  <div style="width: 36px; height: 50px; background: #FFFFFF; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; box-shadow: 0 1px 0 rgba(0,0,0,0.3);">
+    <div style="font-size: 14px; font-weight: 500; color: #1A1D21; line-height: 1;">A</div>
+    <div style="font-size: 12px; color: #C84B4B; line-height: 1;">♥</div>
+  </div>
+  <div style="width: 36px; height: 50px; background: #FFFFFF; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; box-shadow: 0 1px 0 rgba(0,0,0,0.3);">
+    <div style="font-size: 14px; font-weight: 500; color: #1A1D21; line-height: 1;">K</div>
+    <div style="font-size: 12px; color: #1A1D21; line-height: 1;">♠</div>
+  </div>
+  <div style="width: 36px; height: 50px; background: #FFFFFF; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; box-shadow: 0 1px 0 rgba(0,0,0,0.3);">
+    <div style="font-size: 14px; font-weight: 500; color: #1A1D21; line-height: 1;">7</div>
+    <div style="font-size: 12px; color: #C84B4B; line-height: 1;">♦</div>
+  </div>
+</div>
+
+<div style="position: absolute; top: -10px; left: 8%; width: 150px;">
+  <div style="display: flex; justify-content: center; gap: 4px; margin-bottom: -10px; position: relative; z-index: 2;">
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid #2D333B; border-radius: 4px; padding: 3px; box-sizing: border-box;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #1F6F4A, #1F6F4A 2px, #155637 2px, #155637 4px); position: relative;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; background: #14171A; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #E5B96A;">♠</div>
+      </div>
+    </div>
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid #2D333B; border-radius: 4px; padding: 3px; box-sizing: border-box;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #1F6F4A, #1F6F4A 2px, #155637 2px, #155637 4px); position: relative;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; background: #14171A; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #E5B96A;">♠</div>
+      </div>
+    </div>
+  </div>
+  <div style="background: #14171A; border: 0.5px solid #2D333B; border-radius: 8px; padding: 8px 10px; padding-top: 14px;">
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: #2D333B; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: #E8EAED; font-weight: 500;">SK</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 11px; color: #E8EAED; font-weight: 500; line-height: 1.1;">sam</div>
+        <div style="font-size: 9px; color: #9AA0A6;">23 BBs</div>
+      </div>
+      <div style="font-size: 9px; color: #9AA0A6; background: rgba(154,160,166,0.12); padding: 1px 5px; border-radius: 3px; font-weight: 500;">SB</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="flex: 1; height: 6px; background: #2D333B; border-radius: 3px; overflow: hidden;">
+        <div style="width: 92%; height: 100%; background: #1F6F4A;"></div>
+      </div>
+      <div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 11px; color: #1F6F4A; font-weight: 500; min-width: 26px; text-align: right;">92</div>
+    </div>
+    <div style="font-size: 9px; color: #6B7178; margin-top: 3px;">in pot · 12</div>
+  </div>
+</div>
+
+<div style="position: absolute; top: -10px; right: 8%; width: 150px;">
+  <div style="display: flex; justify-content: center; gap: 4px; margin-bottom: -10px; position: relative; z-index: 2;">
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid #2D333B; border-radius: 4px; padding: 3px; box-sizing: border-box; opacity: 0.4;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #2D333B, #2D333B 2px, #1A1D21 2px, #1A1D21 4px);"></div>
+    </div>
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid #2D333B; border-radius: 4px; padding: 3px; box-sizing: border-box; opacity: 0.4;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #2D333B, #2D333B 2px, #1A1D21 2px, #1A1D21 4px);"></div>
+    </div>
+  </div>
+  <div style="background: #14171A; border: 0.5px solid #2D333B; border-radius: 8px; padding: 8px 10px; padding-top: 14px; opacity: 0.55;">
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: #2D333B; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: #9AA0A6; font-weight: 500;">BL</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 11px; color: #9AA0A6; font-weight: 500; line-height: 1.1;">bella</div>
+        <div style="font-size: 9px; color: #C89191;">folded</div>
+      </div>
+      <div style="font-size: 9px; color: #9AA0A6; background: rgba(154,160,166,0.12); padding: 1px 5px; border-radius: 3px; font-weight: 500;">BB</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="flex: 1; height: 6px; background: #2D333B; border-radius: 3px; overflow: hidden;">
+        <div style="width: 24%; height: 100%; background: #C84B4B;"></div>
+      </div>
+      <div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 11px; color: #C84B4B; font-weight: 500; min-width: 26px; text-align: right;">24</div>
+    </div>
+    <div style="font-size: 9px; color: #6B7178; margin-top: 3px;">6 BBs</div>
+  </div>
+</div>
+
+<div style="position: absolute; top: 38%; left: -2%; width: 150px;">
+  <div style="display: flex; justify-content: center; gap: 4px; margin-bottom: -10px; position: relative; z-index: 2;">
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid #2D333B; border-radius: 4px; padding: 3px; box-sizing: border-box; opacity: 0.4;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #2D333B, #2D333B 2px, #1A1D21 2px, #1A1D21 4px);"></div>
+    </div>
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid #2D333B; border-radius: 4px; padding: 3px; box-sizing: border-box; opacity: 0.4;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #2D333B, #2D333B 2px, #1A1D21 2px, #1A1D21 4px);"></div>
+    </div>
+  </div>
+  <div style="background: #14171A; border: 0.5px solid #2D333B; border-radius: 8px; padding: 8px 10px; padding-top: 14px; opacity: 0.55;">
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: #2D333B; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: #9AA0A6; font-weight: 500;">VV</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 11px; color: #9AA0A6; font-weight: 500; line-height: 1.1;">vivi</div>
+        <div style="font-size: 9px; color: #C89191;">folded</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="flex: 1; height: 6px; background: #2D333B; border-radius: 3px; overflow: hidden;">
+        <div style="width: 67%; height: 100%; background: #1F6F4A;"></div>
+      </div>
+      <div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 11px; color: #1F6F4A; font-weight: 500; min-width: 26px; text-align: right;">67</div>
+    </div>
+    <div style="font-size: 9px; color: #6B7178; margin-top: 3px;">17 BBs</div>
+  </div>
+</div>
+
+<div style="position: absolute; top: 38%; right: -2%; width: 150px;">
+  <div style="display: flex; justify-content: center; gap: 4px; margin-bottom: -10px; position: relative; z-index: 2;">
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid rgba(31,111,74,0.6); border-radius: 4px; padding: 3px; box-sizing: border-box;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #1F6F4A, #1F6F4A 2px, #155637 2px, #155637 4px); position: relative;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; background: #14171A; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #E5B96A;">♠</div>
+      </div>
+    </div>
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid rgba(31,111,74,0.6); border-radius: 4px; padding: 3px; box-sizing: border-box;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #1F6F4A, #1F6F4A 2px, #155637 2px, #155637 4px); position: relative;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; background: #14171A; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #E5B96A;">♠</div>
+      </div>
+    </div>
+  </div>
+  <div style="background: #14171A; border: 0.5px solid #1F6F4A; border-radius: 8px; padding: 8px 10px; padding-top: 14px; box-shadow: 0 0 0 1px rgba(31,111,74,0.3);">
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: #1F6F4A; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: #E5B96A; font-weight: 500;">BD</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 11px; color: #E8EAED; font-weight: 500; line-height: 1.1;">bigD</div>
+        <div style="font-size: 9px; color: #1F6F4A; font-weight: 500;">acting · 28 BBs</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="flex: 1; height: 6px; background: #2D333B; border-radius: 3px; overflow: hidden;">
+        <div style="width: 100%; height: 100%; background: #1F6F4A;"></div>
+      </div>
+      <div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 11px; color: #1F6F4A; font-weight: 500; min-width: 26px; text-align: right;">114</div>
+    </div>
+    <div style="font-size: 9px; color: #E5B96A; margin-top: 3px;">in pot · 28</div>
+  </div>
+</div>
+
+<div style="position: absolute; bottom: -10px; left: 18%; width: 150px;">
+  <div style="display: flex; justify-content: center; gap: 4px; margin-bottom: -10px; position: relative; z-index: 2;">
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid #2D333B; border-radius: 4px; padding: 3px; box-sizing: border-box; opacity: 0.4;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #2D333B, #2D333B 2px, #1A1D21 2px, #1A1D21 4px);"></div>
+    </div>
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid #2D333B; border-radius: 4px; padding: 3px; box-sizing: border-box; opacity: 0.4;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #2D333B, #2D333B 2px, #1A1D21 2px, #1A1D21 4px);"></div>
+    </div>
+  </div>
+  <div style="background: #14171A; border: 0.5px solid #2D333B; border-radius: 8px; padding: 8px 10px; padding-top: 14px; opacity: 0.55;">
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: #2D333B; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: #9AA0A6; font-weight: 500;">DN</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 11px; color: #9AA0A6; font-weight: 500; line-height: 1.1;">danilo</div>
+        <div style="font-size: 9px; color: #C89191;">folded</div>
+      </div>
+      <div style="font-size: 9px; color: #E5B96A; background: rgba(229,185,106,0.12); padding: 1px 5px; border-radius: 3px; font-weight: 500;">D</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="flex: 1; height: 6px; background: #2D333B; border-radius: 3px; overflow: hidden;">
+        <div style="width: 80%; height: 100%; background: #E5B96A;"></div>
+      </div>
+      <div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 11px; color: #E5B96A; font-weight: 500; min-width: 26px; text-align: right;">80</div>
+    </div>
+    <div style="font-size: 9px; color: #6B7178; margin-top: 3px;">20 BBs · button</div>
+  </div>
+</div>
+
+<div style="position: absolute; bottom: -10px; right: 18%; width: 150px;">
+  <div style="display: flex; justify-content: center; gap: 4px; margin-bottom: -10px; position: relative; z-index: 2;">
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid rgba(229,185,106,0.5); border-radius: 4px; padding: 3px; box-sizing: border-box;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #1F6F4A, #1F6F4A 2px, #155637 2px, #155637 4px); position: relative;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; background: #14171A; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #E5B96A;">♠</div>
+      </div>
+    </div>
+    <div style="width: 32px; height: 44px; background: #14171A; border: 0.5px solid rgba(229,185,106,0.5); border-radius: 4px; padding: 3px; box-sizing: border-box;">
+      <div style="width: 100%; height: 100%; border-radius: 2px; background: repeating-linear-gradient(45deg, #1F6F4A, #1F6F4A 2px, #155637 2px, #155637 4px); position: relative;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; background: #14171A; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #E5B96A;">♠</div>
+      </div>
+    </div>
+  </div>
+  <div style="background: #14171A; border: 0.5px solid #E5B96A; border-radius: 8px; padding: 8px 10px; padding-top: 14px; box-shadow: 0 0 0 1px rgba(229,185,106,0.3);">
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: #1F6F4A; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: #E5B96A; font-weight: 500;">MC</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 11px; color: #E8EAED; font-weight: 500; line-height: 1.1;">mattcasanova</div>
+        <div style="font-size: 9px; color: #1F6F4A; font-weight: 500;">30 BBs · CO</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="flex: 1; height: 6px; background: #2D333B; border-radius: 3px; overflow: hidden;">
+        <div style="width: 100%; height: 100%; background: #1F6F4A;"></div>
+      </div>
+      <div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 11px; color: #1F6F4A; font-weight: 500; min-width: 26px; text-align: right;">119</div>
+    </div>
+    <div style="font-size: 9px; color: #E5B96A; margin-top: 3px;">in pot · 28 · you</div>
+  </div>
+</div>
+
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; padding: 0 4px;">
+  <div style="display: flex; gap: 3px;">
+    <div style="width: 36px; height: 50px; background: #FFFFFF; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif;">
+      <div style="font-size: 14px; font-weight: 500; color: #1A1D21; line-height: 1;">Q</div>
+      <div style="font-size: 12px; color: #1A1D21; line-height: 1;">♣</div>
+    </div>
+    <div style="width: 36px; height: 50px; background: #FFFFFF; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif;">
+      <div style="font-size: 14px; font-weight: 500; color: #1A1D21; line-height: 1;">J</div>
+      <div style="font-size: 12px; color: #1A1D21; line-height: 1;">♣</div>
+    </div>
+  </div>
+  <div style="flex: 1;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+      <div style="font-size: 10px; color: #9FCFB6; letter-spacing: 0.04em; min-width: 28px;">BET</div>
+      <div style="flex: 1; display: flex; align-items: center; gap: 0; background: rgba(20,23,26,0.5); border: 0.5px solid #2D333B; border-radius: 6px; overflow: hidden;">
+        <button style="padding: 8px 10px; background: transparent; border: 0; border-right: 0.5px solid #2D333B; color: #9AA0A6; font-size: 13px; font-family: inherit; cursor: pointer;">−</button>
+        <input type="text" value="40" style="flex: 1; padding: 8px 10px; background: transparent; border: 0; color: #E5B96A; font-family: 'Bricolage Grotesque', sans-serif; font-size: 16px; font-weight: 500; text-align: center; outline: none; min-width: 60px;" />
+        <button style="padding: 8px 10px; background: transparent; border: 0; border-left: 0.5px solid #2D333B; color: #9AA0A6; font-size: 13px; font-family: inherit; cursor: pointer;">+</button>
+      </div>
+      <div style="font-size: 10px; color: #6B7178; min-width: 36px; text-align: right;">min 28</div>
+    </div>
+    <div style="display: flex; gap: 4px;">
+      <button style="flex: 1; padding: 6px; background: rgba(20,23,26,0.4); border: 0.5px solid #2D333B; border-radius: 4px; color: #9AA0A6; font-size: 10px; font-family: inherit; cursor: pointer;">½ pot</button>
+      <button style="flex: 1; padding: 6px; background: rgba(20,23,26,0.4); border: 0.5px solid #2D333B; border-radius: 4px; color: #9AA0A6; font-size: 10px; font-family: inherit; cursor: pointer;">¾ pot</button>
+      <button style="flex: 1; padding: 6px; background: rgba(20,23,26,0.4); border: 0.5px solid #2D333B; border-radius: 4px; color: #9AA0A6; font-size: 10px; font-family: inherit; cursor: pointer;">pot</button>
+      <button style="flex: 1; padding: 6px; background: rgba(229,185,106,0.1); border: 0.5px solid rgba(229,185,106,0.3); border-radius: 4px; color: #E5B96A; font-size: 10px; font-family: inherit; cursor: pointer;">all in</button>
+    </div>
+  </div>
+</div>
+<div style="display: flex; gap: 8px; margin-top: 8px; padding: 0 4px;">
+  <button style="flex: 1; padding: 10px; background: rgba(200,75,75,0.15); border: 0.5px solid rgba(200,75,75,0.4); border-radius: 6px; color: #E89898; font-size: 12px; font-family: inherit; font-weight: 500; cursor: pointer;">Fold</button>
+  <button style="flex: 1; padding: 10px; background: rgba(154,160,166,0.15); border: 0.5px solid rgba(154,160,166,0.3); border-radius: 6px; color: #E8EAED; font-size: 12px; font-family: inherit; font-weight: 500; cursor: pointer;">Check</button>
+  <button style="flex: 1.6; padding: 10px; background: #E5B96A; border: 0.5px solid #E5B96A; border-radius: 6px; color: #1A1D21; font-size: 12px; font-family: inherit; font-weight: 500; cursor: pointer;">Bet 40</button>
+</div>
+
+</div>
+
+<div style="background: #14171A; border-left: 0.5px solid #2D333B; display: flex; flex-direction: column;">
+
+<div style="padding: 12px 14px; border-bottom: 0.5px solid #2D333B;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+    <div style="font-size: 10px; color: #9AA0A6; letter-spacing: 0.06em; font-weight: 500;">PLACEMENT</div>
+    <div style="font-size: 9px; color: #6B7178;">avg 80</div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 5px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 14px; height: 14px; border-radius: 50%; background: rgba(229,185,106,0.2); color: #E5B96A; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500;">1</div>
+        <span style="color: #E5B96A; font-weight: 500;">you</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 9px; color: #6B7178;">30bb</span>
+        <span style="color: #1F6F4A; font-weight: 500; min-width: 26px; text-align: right;">119</span>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 14px; height: 14px; border-radius: 50%; background: rgba(229,185,106,0.2); color: #E5B96A; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500;">2</div>
+        <span style="color: #E8EAED;">bigD</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 9px; color: #6B7178;">28bb</span>
+        <span style="color: #1F6F4A; font-weight: 500; min-width: 26px; text-align: right;">114</span>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 14px; height: 14px; border-radius: 50%; background: rgba(229,185,106,0.2); color: #E5B96A; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500;">3</div>
+        <span style="color: #E8EAED;">sam</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 9px; color: #6B7178;">23bb</span>
+        <span style="color: #1F6F4A; font-weight: 500; min-width: 26px; text-align: right;">92</span>
+      </div>
+    </div>
+    <div style="height: 1px; background: #2D333B; margin: 2px 0;"></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 14px; height: 14px; border-radius: 50%; background: rgba(200,75,75,0.15); color: #C89191; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500;">4</div>
+        <span style="color: #E8EAED;">danilo</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 9px; color: #6B7178;">20bb</span>
+        <span style="color: #E5B96A; font-weight: 500; min-width: 26px; text-align: right;">80</span>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 14px; height: 14px; border-radius: 50%; background: rgba(200,75,75,0.15); color: #C89191; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500;">5</div>
+        <span style="color: #E8EAED;">vivi</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 9px; color: #6B7178;">17bb</span>
+        <span style="color: #1F6F4A; font-weight: 500; min-width: 26px; text-align: right;">67</span>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 14px; height: 14px; border-radius: 50%; background: rgba(200,75,75,0.15); color: #C89191; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500;">6</div>
+        <span style="color: #E8EAED;">bella</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 9px; color: #C84B4B;">6bb</span>
+        <span style="color: #C84B4B; font-weight: 500; min-width: 26px; text-align: right;">24</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="padding: 12px 14px; border-bottom: 0.5px solid #2D333B; flex: 1;">
+  <div style="font-size: 10px; color: #9AA0A6; letter-spacing: 0.06em; font-weight: 500; margin-bottom: 8px;">ACTION</div>
+  <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: #9AA0A6; line-height: 1.4;">
+    <div style="color: #6B7178; font-size: 10px;">— hand 847 —</div>
+    <div><span style="color: #E8EAED;">bigD</span> raises to <span style="color: #E5B96A;">12</span></div>
+    <div><span style="color: #E5B96A;">you</span> 3-bet to <span style="color: #E5B96A;">28</span></div>
+    <div><span style="color: #E8EAED;">bella</span> folds</div>
+    <div><span style="color: #E8EAED;">sam</span> calls <span style="color: #E5B96A;">28</span></div>
+    <div><span style="color: #E8EAED;">bigD</span> calls <span style="color: #E5B96A;">28</span></div>
+    <div style="color: #6B7178; font-size: 10px; padding-top: 2px; border-top: 0.5px dashed #2D333B; margin-top: 2px;">— flop —</div>
+    <div style="color: #E5B96A;">your turn</div>
+  </div>
+</div>
+
+<div style="padding: 10px 14px;">
+  <div style="display: flex; gap: 6px;">
+    <button style="flex: 1; padding: 6px; background: transparent; border: 0.5px solid #2D333B; border-radius: 4px; color: #9AA0A6; font-size: 10px; font-family: inherit; cursor: pointer;">Chat</button>
+    <button style="flex: 1; padding: 6px; background: transparent; border: 0.5px solid #2D333B; border-radius: 4px; color: #9AA0A6; font-size: 10px; font-family: inherit; cursor: pointer;">Settings</button>
+  </div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+</body>
+</html>

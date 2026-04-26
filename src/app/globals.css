@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* ─── Design Tokens ─── */
+:root {
+  /* Charcoal surfaces */
+  --surface-page: #0E1013;
+  --surface-deep: #14171A;
+  --surface-primary: #1A1D21;
+  --surface-card: #252A30;
+  --border: #2D333B;
+
+  /* Felt green */
+  --felt: #1F6F4A;
+  --felt-deep: #155637;
+  --felt-deepest: #0F4029;
+  --felt-light: #9FCFB6;
+  --felt-muted: #6FA68A;
+
+  /* Gold */
+  --gold: #E5B96A;
+  --gold-dark: #8A6E2E;
+
+  /* Red */
+  --red: #C84B4B;
+  --red-muted: #C89191;
+  --red-dark: #7A2828;
+
+  /* Text */
+  --text-primary: #E8EAED;
+  --text-secondary: #9AA0A6;
+  --text-tertiary: #6B7178;
+
+  /* Misc */
+  --green-light-text: #C8E6D6;
+}
+
+@theme inline {
+  /* Surfaces */
+  --color-surface-page: var(--surface-page);
+  --color-surface-deep: var(--surface-deep);
+  --color-surface-primary: var(--surface-primary);
+  --color-surface-card: var(--surface-card);
+  --color-border: var(--border);
+
+  /* Felt */
+  --color-felt: var(--felt);
+  --color-felt-deep: var(--felt-deep);
+  --color-felt-deepest: var(--felt-deepest);
+  --color-felt-light: var(--felt-light);
+  --color-felt-muted: var(--felt-muted);
+
+  /* Gold */
+  --color-gold: var(--gold);
+  --color-gold-dark: var(--gold-dark);
+
+  /* Red */
+  --color-red: var(--red);
+  --color-red-muted: var(--red-muted);
+  --color-red-dark: var(--red-dark);
+
+  /* Text */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-green-light-text: var(--green-light-text);
+
+  /* Fonts */
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-bricolage);
+}
+
+body {
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
