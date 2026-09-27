@@ -94,7 +94,11 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 - Practice games run entirely client-side (deck is in browser state) — fine for unrated bots, never for real-money/ranked play.
 - `/practice` is rendered with `ssr: false` because the deck seed is random per game.
 - Background browser tabs throttle CSS animations; dealt cards can look invisible in screenshots of an unfocused tab.
+- **Table stage**: PokerTable lays everything out on a fixed stage (landscape 1000×640, portrait 540×880) and scales it to fit, picking whichever orientation renders larger. All seat/bet/board positions are % of the stage; don't size table elements from the viewport.
+- **All-in runouts**: the engine deals every remaining street in one action. `usePracticeGame` detects this, exposes `runout`, and serves a masked view (`maskResult` in lib/practice/runout.ts) until the schedule finishes, so stacks, standings, and the log don't spoil the result. Flip timing lives in `runoutSchedule()`.
+- **Audio** is synthesized with Web Audio (`src/lib/audio.ts`), no asset files. The AudioContext unlocks on the first pointer/key event.
+- Don't use requestAnimationFrame for state that must advance while the tab is hidden (rAF pauses in background tabs); use a timer.
 - Anything rendered inside the sticky NavRail (or other stacking contexts) must portal modals to `document.body` — see SettingsDialog.
 - Tailwind v4 `translate-*` utilities use the CSS `translate` property, which stacks with an inline `transform: translate(...)`. Don't mix them on one element.
 - Player notes for bots are keyed by bot name (bots are regenerated each game); real players will key by user id.
-- Table layout is desktop-first; the sidebar hides below `lg` but small phones are not tuned yet.
+- Below `lg` the table sidebar becomes a drawer (Standings button); below `md` the lobby swaps the nav rail for a top bar.

@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type SoundName, play } from "@/lib/audio";
 import { type BotLevel, decideBotAction } from "@/lib/engine/bots";
 import {
   type Action,
   type GameState,
   type LogEvent,
+  alivePlayers,
   applyAction,
   createGame,
   legalActions,
@@ -13,6 +15,7 @@ import {
 } from "@/lib/engine/game";
 import { type ModeId, MODES } from "@/lib/engine/modes";
 import { botSeats } from "@/lib/practice/bots";
+import { maskResult, runoutSchedule } from "@/lib/practice/runout";
 import { useSettings } from "@/lib/settings";
 import { type StatsTable, accumulateHand } from "@/lib/stats";
 
@@ -32,10 +35,21 @@ export interface Turn {
   startedAt: number;
 }
 
+/** An all-in runout being revealed street by street. */
+export interface Runout {
+  hand: number;
+  /** Board cards already face up before the runout began. */
+  from: number;
+  startedAt: number;
+}
+
 const PACE = {
   normal: { botMin: 650, botMax: 1500, handEnd: 1600, showdownEnd: 3200 },
   fast: { botMin: 60, botMax: 120, handEnd: 250, showdownEnd: 450 },
 };
+
+/** Per-card deal stagger, shared with the table's deal animation. */
+export const DEAL_STAGGER_MS = 75;
 
 function initialGame(mode: ModeId, level: BotLevel, heroName: string): GameState {
   const bots = botSeats(MODES[mode].seats - 1, level);
@@ -54,6 +68,33 @@ function runToEnd(state: GameState, level: BotLevel): GameState {
   return s;
 }
 
+/** Sounds for newly appended log events. Runout streets and wins are played by the reveal instead. */
+function soundsFor(events: LogEvent[], state: GameState, runout: boolean) {
+  for (const e of events) {
+    let name: SoundName | null = null;
+    switch (e.kind) {
+      case "hand": {
+        const dealt = alivePlayers(state).length * 2;
+        for (let i = 0; i < dealt; i++) play("deal", i * DEAL_STAGGER_MS);
+        break;
+      }
+      case "level":
+        name = "levelUp";
+        break;
+      case "action":
+        name = e.allIn ? "allIn" : e.action === "raise" ? "bet" : e.action;
+        break;
+      case "street":
+        if (!runout) e.cards.forEach((_, i) => play("flip", 180 + i * 110));
+        break;
+      case "win":
+        if (!runout) name = "win";
+        break;
+    }
+    if (name) play(name);
+  }
+}
+
 export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you") {
   const config = MODES[mode];
   const { practiceClock } = useSettings();
@@ -61,15 +102,21 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
   const [history, setHistory] = useState<HandHistory[]>([]);
   const [stats, setStats] = useState<StatsTable>({});
   const [turn, setTurn] = useState<Turn | null>(null);
+  const [runout, setRunout] = useState<Runout | null>(null);
+  const [revealedHand, setRevealedHand] = useState(0);
   const [bankMs, setBankMs] = useState(config.timeBankSeconds * 1000);
   const [seated, setSeated] = useState(1);
   const [spectating, setSpectating] = useState(false);
   const processedHand = useRef(0);
 
+  const runoutActive = runout !== null && runout.hand === game.handNumber && revealedHand !== game.handNumber;
+  // While a runout plays, everything on screen reflects the hand before it resolved.
+  const view = useMemo(() => (runoutActive ? maskResult(game) : game), [runoutActive, game]);
+
   const seats = game.players.length;
-  const hero = game.players[HERO];
+  const hero = view.players[HERO];
   const stage: TableStage =
-    seated < seats ? "seating" : game.phase === "finished" ? "finished" : hero.eliminated ? "eliminated" : "playing";
+    seated < seats ? "seating" : view.phase === "finished" ? "finished" : hero.eliminated ? "eliminated" : "playing";
   const pace = spectating ? PACE.fast : PACE.normal;
   const decisionMs = config.decisionSeconds * 1000;
 
@@ -83,17 +130,32 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
   }, [endStage]);
   const showResult = endStage !== null && resultFor === endStage && (endStage === "finished" || !spectating);
 
-  const commit = useCallback((next: GameState) => {
+  const commit = useCallback((next: GameState, prev: GameState, quiet = false) => {
+    const sameHand = prev.handNumber === next.handNumber;
+    const fresh = next.log.slice(sameHand ? prev.log.length : 0);
+    const isRunout = !!next.result?.showdown && sameHand && next.board.length > prev.board.length;
+
     setGame(next);
-    setHistory((h) => {
-      const rest = h.length && h[h.length - 1].hand === next.handNumber ? h.slice(0, -1) : h;
-      return [...rest, { hand: next.handNumber, events: next.log }].slice(-12);
-    });
     setTurn(
       next.phase === "betting" && next.toAct !== null
         ? { key: `${next.handNumber}:${next.log.length}`, player: next.toAct, startedAt: Date.now() }
         : null,
     );
+    if (isRunout && !quiet) setRunout({ hand: next.handNumber, from: prev.board.length, startedAt: Date.now() });
+    if (!quiet) {
+      soundsFor(fresh, next, isRunout);
+      if (next.toAct === HERO && (prev.toAct !== HERO || !sameHand)) {
+        play("yourTurn", sameHand ? 0 : alivePlayers(next).length * 2 * DEAL_STAGGER_MS);
+      }
+    }
+
+    // Runout hands enter the history once the reveal finishes (see below).
+    if (!isRunout || quiet) {
+      setHistory((h) => {
+        const rest = h.length && h[h.length - 1].hand === next.handNumber ? h.slice(0, -1) : h;
+        return [...rest, { hand: next.handNumber, events: next.log }].slice(-12);
+      });
+    }
     if (next.result && processedHand.current !== next.handNumber) {
       processedHand.current = next.handNumber;
       const dealt: Record<number, string> = {};
@@ -104,10 +166,32 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
     }
   }, []);
 
+  // Drive the runout: flip sounds on schedule, then reveal the result.
+  useEffect(() => {
+    if (!runout || runout.hand !== game.handNumber) return;
+    const { flipAt, doneAt } = runoutSchedule(runout.from);
+    const elapsed = Date.now() - runout.startedAt;
+    for (let i = runout.from; i < game.board.length; i++) {
+      play("deal", (i - runout.from) * 90);
+      if (flipAt[i] !== undefined) play("flip", Math.max(0, flipAt[i] - elapsed));
+    }
+    const t = setTimeout(() => {
+      setRevealedHand(runout.hand);
+      setHistory((h) => {
+        const rest = h.length && h[h.length - 1].hand === game.handNumber ? h.slice(0, -1) : h;
+        return [...rest, { hand: game.handNumber, events: game.log }].slice(-12);
+      });
+      play("win");
+    }, Math.max(0, doneAt - elapsed));
+    return () => clearTimeout(t);
+    // Only re-run when a new runout starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runout]);
+
   // Opponents take their seats one by one before the first deal.
   useEffect(() => {
     if (seated >= seats) return;
-    const t = setTimeout(() => setSeated((n) => n + 1), seated === 1 ? 500 : 180);
+    const t = setTimeout(() => setSeated((n) => n + 1), seated === 1 ? 500 : 220);
     return () => clearTimeout(t);
   }, [seated, seats]);
 
@@ -115,33 +199,36 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
     if (seated < seats) return;
     if (game.phase === "finished") return;
     if (hero.eliminated && !spectating) return;
+    if (runoutActive) return;
 
     if (game.phase === "waiting") {
-      const t = setTimeout(() => commit(startHand(game)), 700);
+      const t = setTimeout(() => commit(startHand(game), game), 900);
       return () => clearTimeout(t);
     }
     if (game.phase === "complete") {
       const delay = game.result?.showdown ? pace.showdownEnd : pace.handEnd;
-      const t = setTimeout(() => commit(startHand(game)), delay);
+      const t = setTimeout(() => commit(startHand(game), game, spectating), delay);
       return () => clearTimeout(t);
     }
     if (game.toAct !== null && game.toAct !== HERO) {
-      const delay = pace.botMin + Math.random() * (pace.botMax - pace.botMin);
-      const t = setTimeout(() => commit(applyAction(game, decideBotAction(game, level))), delay);
+      // Wait out the deal animation before the first action of a hand.
+      const dealing = game.log.length <= 4 ? alivePlayers(game).length * 2 * DEAL_STAGGER_MS : 0;
+      const delay = dealing + pace.botMin + Math.random() * (pace.botMax - pace.botMin);
+      const t = setTimeout(() => commit(applyAction(game, decideBotAction(game, level)), game, spectating), delay);
       return () => clearTimeout(t);
     }
-  }, [game, seated, seats, hero.eliminated, spectating, level, pace, commit]);
+  }, [game, seated, seats, hero.eliminated, spectating, level, pace, commit, runoutActive]);
 
   const act = useCallback(
     (action: Action) => {
-      if (game.toAct !== HERO) return;
+      if (game.toAct !== HERO || runoutActive) return;
       if (turn && practiceClock) {
         const overtime = Date.now() - turn.startedAt - decisionMs;
         if (overtime > 0) setBankMs((b) => Math.max(0, b - overtime));
       }
-      commit(applyAction(game, action));
+      commit(applyAction(game, action), game);
     },
-    [game, commit, turn, practiceClock, decisionMs],
+    [game, commit, turn, practiceClock, decisionMs, runoutActive],
   );
 
   // Hero's clock: after the decision time and then the time bank run out, check or fold.
@@ -152,17 +239,17 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
       const legal = legalActions(game);
       if (!legal) return;
       setBankMs(0);
-      commit(applyAction(game, { type: legal.canCheck ? "check" : "fold" }));
+      commit(applyAction(game, { type: legal.canCheck ? "check" : "fold" }), game);
     }, Math.max(0, remaining));
     return () => clearTimeout(t);
   }, [practiceClock, turn, game, decisionMs, bankMs, commit]);
 
-  const skipToResults = useCallback(() => commit(runToEnd(game, level)), [game, level, commit]);
+  const skipToResults = useCallback(() => commit(runToEnd(game, level), game, true), [game, level, commit]);
 
-  const heroLegal = useMemo(() => (game.toAct === HERO ? legalActions(game) : null), [game]);
+  const heroLegal = useMemo(() => (game.toAct === HERO && !runoutActive ? legalActions(game) : null), [game, runoutActive]);
 
   return {
-    game,
+    game: view,
     history,
     stats,
     stage,
@@ -170,6 +257,7 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
     heroLegal,
     spectating,
     showResult,
+    runout: runoutActive ? runout : null,
     clock: practiceClock ? { turn, decisionMs, bankMs } : null,
     act,
     watch: () => setSpectating(true),

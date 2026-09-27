@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { play } from "@/lib/audio";
 
 export interface ClockInfo {
   startedAt: number;
@@ -41,19 +42,29 @@ export function SeatTimer({ clock }: { clock: ClockInfo }) {
 }
 
 /** Seconds readout for the hero's action bar. */
-export function ClockReadout({ clock }: { clock: ClockInfo }) {
+export function ClockReadout({ clock, compact = false }: { clock: ClockInfo; compact?: boolean }) {
   const now = useNow(true, 200);
   const { mainLeft, inBank, bankLeft, fraction, color } = clockState(clock, now);
   const seconds = Math.ceil((inBank ? bankLeft : mainLeft) / 1000);
   const urgent = !inBank && fraction <= 0.15;
+  // Tick only in the final countdown: inside the time bank, or when no bank is left.
+  const lastSeconds = seconds <= 5 && seconds > 0 && (inBank || clock.bankMs === 0);
+  useEffect(() => {
+    if (lastSeconds) play("tick");
+  }, [seconds, lastSeconds]);
   return (
     <div className="flex flex-col items-center justify-center" role="timer" aria-live={urgent ? "assertive" : "off"}>
-      <span className={`font-display text-[20px] font-semibold tabular-nums leading-none ${urgent ? "animate-pulse" : ""}`} style={{ color }}>
+      <span
+        className={`font-display font-semibold tabular-nums leading-none ${compact ? "text-[15px]" : "text-[20px]"} ${urgent ? "animate-pulse" : ""}`}
+        style={{ color }}
+      >
         {seconds}s
       </span>
-      <span className="mt-1 text-[10px] text-text-tertiary">
-        {inBank ? "time bank" : `bank ${Math.ceil(clock.bankMs / 1000)}s`}
-      </span>
+      {!compact && (
+        <span className="mt-1 text-[10px] text-text-tertiary">
+          {inBank ? "time bank" : `bank ${Math.ceil(clock.bankMs / 1000)}s`}
+        </span>
+      )}
     </div>
   );
 }

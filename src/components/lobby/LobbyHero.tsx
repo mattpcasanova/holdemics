@@ -72,9 +72,9 @@ export function LobbyHero() {
       className="relative overflow-hidden rounded-2xl border border-border bg-surface-primary"
       style={{ background: "radial-gradient(120% 90% at 85% 50%, rgba(31,111,74,0.28) 0%, transparent 60%), var(--surface-primary)" }}
     >
-      <div className="grid grid-cols-[1fr_1.1fr] items-center gap-4 p-7 max-lg:grid-cols-1">
+      <div className="grid grid-cols-[1fr_1.1fr] items-center gap-4 p-5 sm:p-7 max-lg:grid-cols-1">
         <div>
-          <div role="tablist" aria-label="Game mode" className="mb-6 inline-flex rounded-lg border border-border bg-surface-deep p-1">
+          <div role="tablist" aria-label="Game mode" className="mb-6 inline-flex max-w-full rounded-lg border border-border bg-surface-deep p-1">
             {MODE_ORDER.map((id) => (
               <button
                 key={id}
@@ -90,7 +90,7 @@ export function LobbyHero() {
             ))}
           </div>
 
-          <h1 id="hero-heading" className="min-h-[3.15em] font-display text-[40px] font-semibold leading-[1.05] tracking-[-0.02em]">
+          <h1 id="hero-heading" className="min-h-[3.15em] font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.02em] sm:text-[40px]">
             {mode.seats === 2 ? "Two players. One survives." : "Eight players. One table. Top four climb."}
           </h1>
           <p className="mt-3 min-h-[4.9em] max-w-[46ch] text-[14px] leading-relaxed text-text-secondary">
@@ -98,7 +98,7 @@ export function LobbyHero() {
             player holds it all. Your rating moves on where you finish.
           </p>
 
-          <dl className="mt-5 flex gap-6 text-[13px]">
+          <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
             <div>
               <dt className="text-text-tertiary">Length</dt>
               <dd className="font-medium">{mode.estimatedMinutes}</dd>
@@ -113,7 +113,7 @@ export function LobbyHero() {
             </div>
           </dl>
 
-          <div className="mt-7 flex items-center gap-3">
+          <div className="mt-7 flex flex-wrap items-center gap-3">
             <Link
               href={`/practice?mode=${modeId}&bots=medium`}
               className="whitespace-nowrap rounded-lg bg-gold px-5 py-3 font-display text-[15px] font-semibold text-surface-primary transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"

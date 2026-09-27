@@ -101,23 +101,28 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
 
   if (!legal) {
     return (
-      <div className="flex h-[112px] items-center justify-center rounded-xl border border-border bg-surface-deep text-[13px] text-text-secondary">
+      <div className="flex h-[64px] items-center justify-center rounded-xl border border-border bg-surface-deep px-3 text-center text-[13px] text-text-secondary sm:h-[112px]">
         {idleText}
       </div>
     );
   }
 
   return (
-    <div className="flex h-[112px] items-stretch gap-3 rounded-xl border border-felt/50 bg-surface-deep p-3 shadow-[0_0_0_1px_rgba(31,111,74,0.25)]">
+    <div className="flex flex-col gap-2 rounded-xl border border-felt/50 bg-surface-deep p-2.5 shadow-[0_0_0_1px_rgba(31,111,74,0.25)] sm:h-[112px] sm:flex-row sm:items-stretch sm:gap-3 sm:p-3">
       {clock && (
-        <div className="flex w-[64px] shrink-0 items-center justify-center rounded-lg bg-surface-primary">
+        <div className="flex shrink-0 items-center justify-center rounded-lg bg-surface-primary max-sm:hidden sm:w-[64px]">
           <ClockReadout clock={clock} />
         </div>
       )}
 
       {legal.canRaise && (
-        <div className="flex min-w-0 flex-1 flex-col justify-between">
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 sm:gap-0">
           <div className="flex gap-1">
+            {clock && (
+              <div className="flex w-[52px] shrink-0 items-center justify-center rounded-md bg-surface-primary sm:hidden">
+                <ClockReadout clock={clock} compact />
+              </div>
+            )}
             {presets.map((p, i) => (
               <button
                 key={p.label}
@@ -125,7 +130,7 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
                 className="relative flex-1 rounded-md border border-border bg-surface-primary py-1.5 text-[12px] text-text-secondary transition-colors hover:border-text-tertiary hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
               >
                 {p.label}
-                <span className="absolute right-1 top-0.5 text-[9px] text-text-tertiary">{i + 1}</span>
+                <span className="absolute right-1 top-0.5 text-[9px] text-text-tertiary max-sm:hidden">{i + 1}</span>
               </button>
             ))}
           </div>
@@ -163,13 +168,18 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
               <span className="text-[11px] text-text-tertiary">HP</span>
             </label>
           </div>
-          <div className="text-[10px] text-text-tertiary">
+          <div className="text-[10px] text-text-tertiary max-sm:hidden">
             ↑ ↓ adjust by 1 BB, Shift for 5 BB, 1–{presets.length} presets
           </div>
         </div>
       )}
 
-      <div className={`flex gap-2 ${legal.canRaise ? "w-[360px]" : "flex-1"}`}>
+      <div className={`flex h-[56px] gap-2 sm:h-auto ${legal.canRaise ? "sm:w-[360px]" : "flex-1"}`}>
+        {clock && !legal.canRaise && (
+          <div className="flex w-[52px] shrink-0 items-center justify-center rounded-lg bg-surface-primary sm:hidden">
+            <ClockReadout clock={clock} compact />
+          </div>
+        )}
         {!legal.canCheck && (
           <ActionButton tone="fold" hotkey="F" onClick={() => onAct({ type: "fold" })}>
             Fold
@@ -214,7 +224,7 @@ function ActionButton({
       }`}
     >
       {children}
-      <span className={`mt-0.5 text-[10px] font-normal ${tone === "raise" ? "text-surface-primary/60" : "text-text-tertiary"}`}>
+      <span className={`mt-0.5 text-[10px] font-normal max-sm:hidden ${tone === "raise" ? "text-surface-primary/60" : "text-text-tertiary"}`}>
         {hotkey}
       </span>
     </button>

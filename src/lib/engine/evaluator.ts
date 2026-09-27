@@ -116,7 +116,7 @@ export function describeHand(value: HandValue): string {
   const [a, b] = value.ranks;
   switch (value.category) {
     case HandCategory.StraightFlush:
-      return a === 14 ? "Royal Flush" : `Straight Flush, ${rankName(a)} high`;
+      return a === 14 ? "Royal Flush" : `Straight Flush, ${straightRange(a)}`;
     case HandCategory.Quads:
       return `Four of a Kind, ${rankName(a, true)}`;
     case HandCategory.FullHouse:
@@ -124,7 +124,7 @@ export function describeHand(value: HandValue): string {
     case HandCategory.Flush:
       return `Flush, ${rankName(a)} high`;
     case HandCategory.Straight:
-      return `Straight, ${rankName(a)} high`;
+      return `Straight, ${straightRange(a)}`;
     case HandCategory.Trips:
       return `Three of a Kind, ${rankName(a, true)}`;
     case HandCategory.TwoPair:
@@ -134,4 +134,18 @@ export function describeHand(value: HandValue): string {
     default:
       return `${rankName(a)} High`;
   }
+}
+
+function straightRange(high: Rank): string {
+  const low = high === 5 ? 14 : ((high - 4) as Rank);
+  return `${rankName(low)} to ${rankName(high)}`;
+}
+
+/** Plain-English name for a two-card starting hand, e.g. "Pocket Sixes" or "Ace-King suited". */
+export function describeStartingHand(cards: Card[]): string {
+  const [x, y] = cards;
+  if (!x || !y) return "";
+  if (x.rank === y.rank) return `Pocket ${rankName(x.rank, true)}`;
+  const [hi, lo] = x.rank > y.rank ? [x, y] : [y, x];
+  return `${rankName(hi.rank)}-${rankName(lo.rank)} ${hi.suit === lo.suit ? "suited" : "offsuit"}`;
 }

@@ -44,7 +44,9 @@ describe("evaluator", () => {
     const wheel = evaluate(parseCards("Ah 2d 3s 4c 5d"));
     const six = evaluate(parseCards("6h 2d 3s 4c 5d"));
     expect(six.score).toBeGreaterThan(wheel.score);
-    expect(describeHand(wheel)).toBe("Straight, Five high");
+    expect(describeHand(wheel)).toBe("Straight, Ace to Five");
+    expect(describeHand(evaluate(parseCards("5h 6d 7s 8c 9d 2c 2h")))).toBe("Straight, Five to Nine");
+    expect(describeHand(evaluate(parseCards("6h 6d 6s Kc Kd 2c 3h")))).toBe("Full House, Sixes full of Kings");
   });
 
   it("picks the best two pair out of three pairs", () => {

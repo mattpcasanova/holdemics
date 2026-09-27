@@ -10,6 +10,9 @@ export interface Settings {
   chips: string;
   /** Enforce the decision clock in practice games. */
   practiceClock: boolean;
+  sound: boolean;
+  /** 0–1 */
+  volume: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -17,6 +20,8 @@ export const DEFAULT_SETTINGS: Settings = {
   cardBack: "classic",
   chips: "classic",
   practiceClock: true,
+  sound: true,
+  volume: 0.6,
 };
 
 export const settingsStore = createLocalStore<Settings>("holdemics:settings", DEFAULT_SETTINGS);

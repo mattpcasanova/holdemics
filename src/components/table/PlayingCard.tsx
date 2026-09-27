@@ -37,6 +37,8 @@ interface PlayingCardProps {
   /** Override the player's chosen skin/style (used by settings previews). */
   backSkin?: string;
   deckStyle?: DeckStyle;
+  /** Pixel offset of the dealer from this card; the card flies in from there. */
+  dealFrom?: { dx: number; dy: number };
 }
 
 export function PlayingCard({
@@ -48,10 +50,19 @@ export function PlayingCard({
   dealDelay,
   backSkin,
   deckStyle,
+  dealFrom,
 }: PlayingCardProps) {
   const settings = useSettings();
   const s = SIZES[size];
-  const anim = dealDelay !== undefined ? { animation: `deal-in 260ms ${dealDelay}ms both ease-out` } : {};
+  const anim: React.CSSProperties = dealFrom
+    ? ({
+        animation: `deal-fly 480ms ${dealDelay ?? 0}ms both cubic-bezier(0.2, 0.8, 0.25, 1)`,
+        "--dx": `${dealFrom.dx}px`,
+        "--dy": `${dealFrom.dy}px`,
+      } as React.CSSProperties)
+    : dealDelay !== undefined
+      ? { animation: `deal-in 300ms ${dealDelay}ms both cubic-bezier(0.2, 0.8, 0.25, 1)` }
+      : {};
 
   if (faceDown || !card) {
     const skin = CARD_BACKS[backSkin ?? settings.cardBack] ?? CARD_BACKS.classic;
