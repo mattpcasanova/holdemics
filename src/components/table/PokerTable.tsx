@@ -9,6 +9,7 @@ import { type GameState, buildPots, positionLabels } from "@/lib/engine/game";
 import { formatHp } from "@/lib/engine/modes";
 import { noteKey, useNotes } from "@/lib/notes";
 import { runoutSchedule } from "@/lib/practice/runout";
+import { BOARD_DEAL_STAGGER_MS, boardFlipDelay } from "@/lib/practice/timing";
 import type { StatsTable } from "@/lib/stats";
 import { ChipStack } from "./ChipStack";
 import { FlipCard } from "./FlipCard";
@@ -24,6 +25,7 @@ interface PokerTableProps {
   stats?: StatsTable;
   clock?: { turn: Turn | null; decisionMs: number; bankMs: number } | null;
   runout?: Runout | null;
+  heroSittingOut?: boolean;
   /** Label for bot players, e.g. "Regular bot". */
   botLabel?: string;
 }
@@ -93,22 +95,32 @@ function dealerButtonPoint(seat: Point, offset: number, n: number, portrait: boo
   return { x: seat.x + Math.sign(50 - seat.x) * 18, y: seat.y - 6 };
 }
 
-/** How many board cards are face up, following the runout schedule while one plays. */
-function useVisibleBoard(runout: Runout | null | undefined, boardLength: number): number {
-  const [flipped, setFlipped] = useState<{ hand: number; count: number } | null>(null);
+/**
+ * Runout progress: how many board cards have been dealt (face down) and how
+ * many have turned face up, following the schedule. Outside a runout, all of
+ * the board is both.
+ */
+function useRunoutProgress(runout: Runout | null | undefined, boardLength: number) {
+  const [progress, setProgress] = useState<{ hand: number; dealt: number; faceUp: number } | null>(null);
   useEffect(() => {
     if (!runout) return;
-    const { flipAt } = runoutSchedule(runout.from);
-    const timers = Object.entries(flipAt).map(([i, t]) =>
-      setTimeout(
-        () => setFlipped({ hand: runout.hand, count: Number(i) + 1 }),
-        Math.max(0, runout.startedAt + t + 350 - Date.now()),
-      ),
-    );
+    const { cards } = runoutSchedule(runout.from);
+    const at = (ms: number) => Math.max(0, runout.startedAt + ms - Date.now());
+    const timers = Object.entries(cards).flatMap(([key, c]) => {
+      const i = Number(key);
+      const bump = (field: "dealt" | "faceUp") => () =>
+        setProgress((p) => {
+          const base = p?.hand === runout.hand ? p : { hand: runout.hand, dealt: runout.from, faceUp: runout.from };
+          return { ...base, [field]: Math.max(base[field], i + 1) };
+        });
+      // Labels update once the card is mostly turned.
+      return [setTimeout(bump("dealt"), at(c.dealAt)), setTimeout(bump("faceUp"), at(c.flipAt + (c.dramatic ? 500 : 250)))];
+    });
     return () => timers.forEach(clearTimeout);
   }, [runout]);
-  if (!runout) return boardLength;
-  return flipped?.hand === runout.hand ? Math.max(flipped.count, runout.from) : runout.from;
+  if (!runout) return { dealt: boardLength, faceUp: boardLength };
+  const p = progress?.hand === runout.hand ? progress : null;
+  return { dealt: p?.dealt ?? runout.from, faceUp: p?.faceUp ?? runout.from };
 }
 
 function madeHand(hole: Card[], board: Card[]): string {
@@ -123,6 +135,7 @@ export function PokerTable({
   stats = {},
   clock,
   runout,
+  heroSittingOut = false,
   botLabel = "Bot",
 }: PokerTableProps) {
   const [selected, setSelected] = useState<{ index: number; anchor: HTMLElement } | null>(null);
@@ -148,7 +161,8 @@ export function PokerTable({
   const layout = seatLayout(n, portrait);
   const labels = positionLabels(game);
   const result = game.phase === "complete" || game.phase === "finished" ? game.result : null;
-  const visibleBoard = game.board.slice(0, useVisibleBoard(runout, game.board.length));
+  const progress = useRunoutProgress(runout, game.board.length);
+  const visibleBoard = game.board.slice(0, progress.faceUp);
   const schedule = runout ? runoutSchedule(runout.from) : null;
 
   // Side pots only exist once someone is all in; otherwise differing bets are just the current street.
@@ -208,22 +222,24 @@ export function PokerTable({
         >
           <div className="flex gap-1.5">
             {Array.from({ length: 5 }).map((_, i) => {
-              const card = game.board[i];
               const size = stage.board;
               const w = size === "md" ? 56 : 42;
               const h = size === "md" ? 78 : 59;
+              // During a runout a street only appears once the dealer reaches it.
+              const card = i < progress.dealt ? game.board[i] : undefined;
               if (!card) {
                 return <div key={`slot-${i}`} className="rounded-md border border-dashed border-white/10" style={{ width: w, height: h }} />;
               }
-              const inRunout = runout && schedule && i >= runout.from;
+              const timing = runout && schedule && i >= runout.from ? schedule.cards[i] : null;
               return (
                 <FlipCard
                   key={`${game.handNumber}-${i}`}
                   card={card}
                   size={size}
-                  flipAt={inRunout ? runout.startedAt + schedule.flipAt[i] : undefined}
-                  flipDelay={i < 3 ? 260 + i * 110 : 260}
-                  dealDelay={inRunout ? (i - runout.from) * 90 : i < 3 ? i * 70 : 0}
+                  flipAt={timing ? runout!.startedAt + timing.flipAt : undefined}
+                  flipDelay={boardFlipDelay(i)}
+                  dramatic={timing?.dramatic}
+                  dealDelay={timing ? 0 : i < 3 ? i * BOARD_DEAL_STAGGER_MS : 0}
                   dealFrom={{ dx: (2 - i) * (w + 6), dy: -24 }}
                 />
               );
@@ -275,14 +291,14 @@ export function PokerTable({
           return (
             <div key={player.id}>
               {player.bet > 0 && (
+                // Chips over the amount keeps each bet compact, so it clears neighbouring seats and cards.
                 <div
-                  className={`absolute z-[45] flex -translate-x-1/2 -translate-y-1/2 items-end gap-1.5 ${
-                    seat.x > 55 && !isHero ? "flex-row-reverse" : ""
-                  }`}
+                  data-bet
+                  className="absolute z-[45] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5"
                   style={{ left: `${bet.x}%`, top: `${bet.y}%`, animation: "chip-in 260ms ease-out both" }}
                 >
-                  <ChipStack amount={player.bet} scale={1.5} />
-                  <span className="mb-0.5 rounded-md border border-white/10 bg-black/60 px-1.5 py-px font-display text-[12px] font-semibold tabular-nums text-text-primary shadow">
+                  <ChipStack amount={player.bet} scale={1.4} maxStacks={2} />
+                  <span className="rounded-md border border-white/10 bg-black/65 px-1.5 font-display text-[12px] font-semibold leading-[18px] tabular-nums text-text-primary shadow">
                     {formatHp(player.bet)}
                   </span>
                 </div>
@@ -300,6 +316,7 @@ export function PokerTable({
                 <Seat
                   player={player}
                   isHero={isHero}
+                  sittingOut={isHero && heroSittingOut}
                   isActing={game.toAct === i}
                   position={labels[i]}
                   bigBlind={game.blinds.bb}

@@ -13,6 +13,7 @@ interface SeatProps {
   player: PlayerState;
   isHero: boolean;
   isActing: boolean;
+  sittingOut?: boolean;
   position?: string;
   bigBlind: number;
   /** Cards to show face up (hero always; others at showdown). */
@@ -29,8 +30,9 @@ interface SeatProps {
   deal?: { dx: number; dy: number; delays: [number, number] };
 }
 
-function statusText(p: PlayerState, isActing: boolean, isHero: boolean): { text: string; tone: string } | null {
+function statusText(p: PlayerState, isActing: boolean, isHero: boolean, sittingOut: boolean): { text: string; tone: string } | null {
   if (p.eliminated) return { text: p.place ? `Out in ${ordinal(p.place)}` : "Out", tone: "text-text-tertiary" };
+  if (sittingOut && !p.lastAction) return { text: "Sitting out", tone: "text-gold" };
   if (isActing) return { text: isHero ? "Your turn" : "Thinking", tone: "text-felt-light" };
   if (p.folded) return { text: "Folded", tone: "text-text-tertiary" };
   const a = p.lastAction;
@@ -55,6 +57,7 @@ export function Seat({
   player,
   isHero,
   isActing,
+  sittingOut = false,
   position,
   bigBlind,
   revealed,
@@ -76,7 +79,7 @@ export function Seat({
   // Folded opponents muck their cards; the hero keeps seeing theirs, dimmed.
   // Players knocked out this hand keep their revealed cards up so you can see what beat them.
   const dealt = player.holeCards.length > 0 && (isHero || !player.folded) && (!out || !!revealed);
-  const status = statusText(player, isActing, isHero);
+  const status = statusText(player, isActing, isHero, sittingOut);
 
   const border = won
     ? "border-gold shadow-[0_0_0_1px_var(--gold),0_0_28px_rgba(229,185,106,0.35)]"

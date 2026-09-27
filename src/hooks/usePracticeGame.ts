@@ -16,6 +16,13 @@ import {
 import { type ModeId, MODES } from "@/lib/engine/modes";
 import { botSeats } from "@/lib/practice/bots";
 import { maskResult, runoutSchedule } from "@/lib/practice/runout";
+import {
+  BOARD_DEAL_STAGGER_MS,
+  DEAL_LAND_MS,
+  DEAL_STAGGER_MS,
+  FLIP_SOUND_OFFSET_MS,
+  boardFlipDelay,
+} from "@/lib/practice/timing";
 import { useSettings } from "@/lib/settings";
 import { type StatsTable, accumulateHand } from "@/lib/stats";
 
@@ -48,8 +55,7 @@ const PACE = {
   fast: { botMin: 60, botMax: 120, handEnd: 250, showdownEnd: 450 },
 };
 
-/** Per-card deal stagger, shared with the table's deal animation. */
-export const DEAL_STAGGER_MS = 75;
+export { DEAL_STAGGER_MS };
 
 function initialGame(mode: ModeId, level: BotLevel, heroName: string): GameState {
   const bots = botSeats(MODES[mode].seats - 1, level);
@@ -75,7 +81,7 @@ function soundsFor(events: LogEvent[], state: GameState, runout: boolean) {
     switch (e.kind) {
       case "hand": {
         const dealt = alivePlayers(state).length * 2;
-        for (let i = 0; i < dealt; i++) play("deal", i * DEAL_STAGGER_MS);
+        for (let i = 0; i < dealt; i++) play("deal", i * DEAL_STAGGER_MS + DEAL_LAND_MS);
         break;
       }
       case "level":
@@ -85,7 +91,12 @@ function soundsFor(events: LogEvent[], state: GameState, runout: boolean) {
         name = e.allIn ? "allIn" : e.action === "raise" ? "bet" : e.action;
         break;
       case "street":
-        if (!runout) e.cards.forEach((_, i) => play("flip", 180 + i * 110));
+        if (!runout) {
+          e.cards.forEach((_, i) => {
+            play("deal", i * BOARD_DEAL_STAGGER_MS);
+            play("flip", boardFlipDelay(i) + FLIP_SOUND_OFFSET_MS);
+          });
+        }
         break;
       case "win":
         if (!runout) name = "win";
@@ -107,6 +118,12 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
   const [bankMs, setBankMs] = useState(config.timeBankSeconds * 1000);
   const [seated, setSeated] = useState(1);
   const [spectating, setSpectating] = useState(false);
+  /** Set when the hero's clock runs out; their turns auto check/fold until they return. */
+  const [sittingOut, setSittingOut] = useState(false);
+  const sittingOutRef = useRef(false);
+  useEffect(() => {
+    sittingOutRef.current = sittingOut;
+  }, [sittingOut]);
   const processedHand = useRef(0);
 
   const runoutActive = runout !== null && runout.hand === game.handNumber && revealedHand !== game.handNumber;
@@ -144,7 +161,7 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
     if (isRunout && !quiet) setRunout({ hand: next.handNumber, from: prev.board.length, startedAt: Date.now() });
     if (!quiet) {
       soundsFor(fresh, next, isRunout);
-      if (next.toAct === HERO && (prev.toAct !== HERO || !sameHand)) {
+      if (next.toAct === HERO && (prev.toAct !== HERO || !sameHand) && !sittingOutRef.current) {
         play("yourTurn", sameHand ? 0 : alivePlayers(next).length * 2 * DEAL_STAGGER_MS);
       }
     }
@@ -169,11 +186,11 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
   // Drive the runout: flip sounds on schedule, then reveal the result.
   useEffect(() => {
     if (!runout || runout.hand !== game.handNumber) return;
-    const { flipAt, doneAt } = runoutSchedule(runout.from);
+    const { cards, doneAt } = runoutSchedule(runout.from);
     const elapsed = Date.now() - runout.startedAt;
-    for (let i = runout.from; i < game.board.length; i++) {
-      play("deal", (i - runout.from) * 90);
-      if (flipAt[i] !== undefined) play("flip", Math.max(0, flipAt[i] - elapsed));
+    for (const [, c] of Object.entries(cards)) {
+      play("deal", Math.max(0, c.dealAt - elapsed + 120));
+      play("flip", Math.max(0, c.flipAt - elapsed + (c.dramatic ? 300 : FLIP_SOUND_OFFSET_MS)));
     }
     const t = setTimeout(() => {
       setRevealedHand(runout.hand);
@@ -233,20 +250,34 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
 
   // Hero's clock: after the decision time and then the time bank run out, check or fold.
   useEffect(() => {
-    if (!practiceClock || !turn || turn.player !== HERO || game.toAct !== HERO) return;
+    if (!practiceClock || sittingOut || !turn || turn.player !== HERO || game.toAct !== HERO) return;
     const remaining = turn.startedAt + decisionMs + bankMs - Date.now();
     const t = setTimeout(() => {
       const legal = legalActions(game);
       if (!legal) return;
       setBankMs(0);
+      setSittingOut(true);
       commit(applyAction(game, { type: legal.canCheck ? "check" : "fold" }), game);
     }, Math.max(0, remaining));
     return () => clearTimeout(t);
-  }, [practiceClock, turn, game, decisionMs, bankMs, commit]);
+  }, [practiceClock, sittingOut, turn, game, decisionMs, bankMs, commit]);
+
+  // Sitting out: check when possible, otherwise fold, without waiting on the clock.
+  useEffect(() => {
+    if (!sittingOut || game.toAct !== HERO || runoutActive || game.phase !== "betting") return;
+    const t = setTimeout(() => {
+      const legal = legalActions(game);
+      if (legal) commit(applyAction(game, { type: legal.canCheck ? "check" : "fold" }), game);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [sittingOut, game, runoutActive, commit]);
 
   const skipToResults = useCallback(() => commit(runToEnd(game, level), game, true), [game, level, commit]);
 
-  const heroLegal = useMemo(() => (game.toAct === HERO && !runoutActive ? legalActions(game) : null), [game, runoutActive]);
+  const heroLegal = useMemo(
+    () => (game.toAct === HERO && !runoutActive && !sittingOut ? legalActions(game) : null),
+    [game, runoutActive, sittingOut],
+  );
 
   return {
     game: view,
@@ -259,6 +290,8 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
     showResult,
     runout: runoutActive ? runout : null,
     clock: practiceClock ? { turn, decisionMs, bankMs } : null,
+    sittingOut,
+    comeBack: () => setSittingOut(false),
     act,
     watch: () => setSpectating(true),
     skipToResults,

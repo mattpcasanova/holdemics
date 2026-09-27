@@ -2,31 +2,45 @@ import type { GameState } from "../engine/game";
 
 /**
  * All-in runout presentation. The engine deals every remaining street at once;
- * the table then shows the board face down and flips it street by street,
- * holding back the result until the river is up.
+ * the table deals each street face down only when it is reached, turns it
+ * over, pauses, and moves on. The river gets a longer, slower reveal.
  */
 
-const FIRST_FLIP = 800;
-const TURN_GAP = 1500;
-const RIVER_GAP = 1900;
-const RESULT_AFTER = 900;
+export interface CardTiming {
+  /** ms from the start of the runout when the card lands face down. */
+  dealAt: number;
+  /** ms from the start when it starts turning over. */
+  flipAt: number;
+  /** Slow, lifted reveal (the river). */
+  dramatic: boolean;
+}
 
-/** When each board card (index 0–4) flips, in ms from the start of the runout. */
-export function runoutSchedule(from: number): { flipAt: Record<number, number>; doneAt: number } {
-  const flipAt: Record<number, number> = {};
-  let t = FIRST_FLIP;
+const DEAL_STAGGER = 90;
+const FLOP_FLIP_STAGGER = 130;
+/** How long a face-down street sits before it turns. */
+const HOLD = { flop: 700, turn: 700, river: 1500 };
+/** Pause after a street is face up before the next one is dealt. */
+const BETWEEN = 1100;
+const RESULT_AFTER = 1000;
+const START = 500;
+export const DRAMATIC_FLIP_MS = 900;
+
+export function runoutSchedule(from: number): { cards: Record<number, CardTiming>; doneAt: number } {
+  const cards: Record<number, CardTiming> = {};
+  let t = START;
   if (from === 0) {
-    flipAt[0] = t;
-    flipAt[1] = t + 120;
-    flipAt[2] = t + 240;
-    t += TURN_GAP;
+    for (let i = 0; i < 3; i++) {
+      cards[i] = { dealAt: t + i * DEAL_STAGGER, flipAt: t + HOLD.flop + i * FLOP_FLIP_STAGGER, dramatic: false };
+    }
+    t += HOLD.flop + 2 * FLOP_FLIP_STAGGER + BETWEEN;
   }
   if (from <= 3) {
-    flipAt[3] = t;
-    t += RIVER_GAP;
+    cards[3] = { dealAt: t, flipAt: t + HOLD.turn, dramatic: false };
+    t += HOLD.turn + BETWEEN;
   }
-  flipAt[4] = t;
-  return { flipAt, doneAt: t + RESULT_AFTER };
+  cards[4] = { dealAt: t, flipAt: t + HOLD.river, dramatic: true };
+  t += HOLD.river + DRAMATIC_FLIP_MS;
+  return { cards, doneAt: t + RESULT_AFTER };
 }
 
 /**

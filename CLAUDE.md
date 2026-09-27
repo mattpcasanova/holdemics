@@ -61,7 +61,7 @@ npm run simulate -- standard 100     # Bot sims: hands/game and avg place per di
 - **Levels are orbit-based**: a level lasts (players alive × orbits) hands, fixed when the level starts, so levels shorten as players bust (`levelHands()` in modes.ts; `handsLeftInLevel` in GameState).
 - **Blinds** (BB in HP, SB = half): 1, 2, 3, 5, 8, 12, 18, 25, 35, 50, 70, 100, …
 - Sim results (mixed bots): Standard ~33 hands, Turbo ~25, Heads-Up ~21. Orbit levels beat fixed 5-hand levels (38 hands) — slower early, faster late, tighter spread.
-- **Clock**: per-decision seconds + per-game time bank (`timeBankSeconds`). Bank drains only after the main clock expires; on full expiry the hero auto-checks or folds. Practice clock can be disabled in Settings; ranked must always enforce it server-side.
+- **Clock**: per-decision seconds + per-game time bank (`timeBankSeconds`). Bank drains only after the main clock expires; on full expiry the hero auto-checks or folds and is put in **sit-out** mode (every turn auto check/fold) until they click "I'm back". Practice clock can be disabled in Settings; ranked must always enforce it server-side.
 - Heads-up: button posts SB, acts first preflop and last postflop.
 - Players busting on the same hand: bigger starting stack gets the better place.
 - Incomplete all-in raises do not reopen raising for players who already acted.
@@ -95,7 +95,7 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 - `/practice` is rendered with `ssr: false` because the deck seed is random per game.
 - Background browser tabs throttle CSS animations; dealt cards can look invisible in screenshots of an unfocused tab.
 - **Table stage**: PokerTable lays everything out on a fixed stage (landscape 1000×640, portrait 540×880) and scales it to fit, picking whichever orientation renders larger. All seat/bet/board positions are % of the stage; don't size table elements from the viewport.
-- **All-in runouts**: the engine deals every remaining street in one action. `usePracticeGame` detects this, exposes `runout`, and serves a masked view (`maskResult` in lib/practice/runout.ts) until the schedule finishes, so stacks, standings, and the log don't spoil the result. Flip timing lives in `runoutSchedule()`.
+- **All-in runouts**: the engine deals every remaining street in one action. `usePracticeGame` detects this, exposes `runout`, and serves a masked view (`maskResult` in lib/practice/runout.ts) until the schedule finishes, so stacks, standings, and the log don't spoil the result. Each street is dealt face down only when reached, then turned; the river holds longer and flips slowly. Timing lives in `runoutSchedule()`; normal-street and deal timings live in `src/lib/practice/timing.ts` and are shared by animations and sound cues — change them there, not inline.
 - **Audio** is synthesized with Web Audio (`src/lib/audio.ts`), no asset files. The AudioContext unlocks on the first pointer/key event.
 - Don't use requestAnimationFrame for state that must advance while the tab is hidden (rAF pauses in background tabs); use a timer.
 - Anything rendered inside the sticky NavRail (or other stacking contexts) must portal modals to `document.body` — see SettingsDialog.

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { ChipIcon } from "@/components/table/ChipStack";
 import { PlayingCard } from "@/components/table/PlayingCard";
 import { play } from "@/lib/audio";
+import { SpeakerIcon } from "./SoundToggle";
 import { CARD_BACKS, CHIP_SETS } from "@/lib/cosmetics";
 import type { Card } from "@/lib/engine/cards";
 import { type DeckStyle, settingsStore, useSettings } from "@/lib/settings";
@@ -63,6 +64,7 @@ function Option({
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useSettings();
+  const muted = !settings.sound || settings.volume === 0;
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -174,39 +176,39 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           <h3 id="sound-heading" className="font-display text-[15px] font-semibold">
             Sound
           </h3>
-          <div className="mt-2 flex flex-col gap-3 rounded-xl border border-border bg-surface-deep p-3">
-            <label className="flex cursor-pointer items-center justify-between gap-4">
-              <span>
-                <span className="block text-[13px] font-medium">Table sounds</span>
-                <span className="block text-[12px] text-text-tertiary">Cards, chips, checks, your turn, and the clock.</span>
-              </span>
-              <input
-                type="checkbox"
-                checked={settings.sound}
-                onChange={(e) => settingsStore.set({ sound: e.target.checked })}
-                className="h-5 w-5 shrink-0 accent-[var(--gold)]"
-              />
-            </label>
-            <div className={`flex items-center gap-3 ${settings.sound ? "" : "pointer-events-none opacity-40"}`}>
-              <span className="w-14 text-[12px] text-text-secondary">Volume</span>
-              <input
-                type="range"
-                aria-label="Volume"
-                min={0}
-                max={1}
-                step={0.05}
-                value={settings.volume}
-                onChange={(e) => settingsStore.set({ volume: Number(e.target.value) })}
-                onPointerUp={() => play("bet")}
-                className="hx-range flex-1"
-              />
-              <button
-                onClick={() => play("win")}
-                className="rounded-md border border-border px-2.5 py-1 text-[12px] text-text-secondary hover:bg-white/5 hover:text-text-primary"
-              >
-                Test
-              </button>
-            </div>
+          <p className="mb-3 text-[12.5px] text-text-secondary">Cards, chips, checks, your turn, and the clock.</p>
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-deep p-3">
+            <button
+              onClick={() => settingsStore.set(muted ? { sound: true, volume: settings.volume || 0.6 } : { sound: false })}
+              aria-label={muted ? "Unmute" : "Mute"}
+              aria-pressed={muted}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition ${
+                muted ? "border-red/40 bg-red/15 text-[#EFA3A3]" : "border-border text-text-primary hover:bg-white/5"
+              }`}
+            >
+              <SpeakerIcon muted={muted} size={18} />
+            </button>
+            <input
+              type="range"
+              aria-label="Volume"
+              min={0}
+              max={1}
+              step={0.05}
+              value={muted ? 0 : settings.volume}
+              onChange={(e) => settingsStore.set({ volume: Number(e.target.value), sound: Number(e.target.value) > 0 })}
+              onPointerUp={() => play("bet")}
+              className="hx-range flex-1"
+            />
+            <span className="w-10 text-right font-display text-[13px] font-semibold tabular-nums">
+              {muted ? "Off" : `${Math.round(settings.volume * 100)}%`}
+            </span>
+            <button
+              onClick={() => play("win")}
+              disabled={muted}
+              className="rounded-md border border-border px-2.5 py-1 text-[12px] text-text-secondary hover:bg-white/5 hover:text-text-primary disabled:opacity-40"
+            >
+              Test
+            </button>
           </div>
         </section>
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { SettingsButton } from "@/components/ui/SettingsDialog";
+import { SoundToggle } from "@/components/ui/SoundToggle";
 import { HERO, usePracticeGame } from "@/hooks/usePracticeGame";
 import { type BotLevel, BOT_LEVELS } from "@/lib/engine/bots";
 import { potTotal } from "@/lib/engine/game";
@@ -25,8 +26,23 @@ export function PracticeTable(props: PracticeTableProps) {
 }
 
 function PracticeTableInner({ mode, level, onPlayAgain }: PracticeTableProps & { onPlayAgain: () => void }) {
-  const { game, history, stats, stage, seated, heroLegal, spectating, showResult, runout, clock, act, watch, skipToResults } =
-    usePracticeGame(mode, level);
+  const {
+    game,
+    history,
+    stats,
+    stage,
+    seated,
+    heroLegal,
+    spectating,
+    showResult,
+    runout,
+    clock,
+    sittingOut,
+    comeBack,
+    act,
+    watch,
+    skipToResults,
+  } = usePracticeGame(mode, level);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const config = MODES[mode];
   const handsLeft = game.handsLeftInLevel;
@@ -98,6 +114,7 @@ function PracticeTableInner({ mode, level, onPlayAgain }: PracticeTableProps & {
           >
             Standings
           </button>
+          <SoundToggle className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-border text-text-secondary transition hover:bg-white/5 hover:text-text-primary" />
           <SettingsButton className="rounded-md border border-border px-2.5 py-1.5 text-[12px] text-text-secondary transition hover:bg-white/5 hover:text-text-primary">
             <span className="max-sm:hidden">Settings</span>
             <span className="sm:hidden" aria-label="Settings">
@@ -117,20 +134,39 @@ function PracticeTableInner({ mode, level, onPlayAgain }: PracticeTableProps & {
               stats={stats}
               clock={clock}
               runout={runout}
+              heroSittingOut={sittingOut}
               botLabel={`${BOT_LEVELS[level].name} bot`}
             />
           </div>
           <div className="mx-auto w-full max-w-[880px] shrink-0">
-            <ActionBar
-              legal={heroLegal}
-              pot={pot}
-              currentBet={game.currentBet}
-              bigBlind={game.blinds.bb}
-              preflop={game.street === "preflop"}
-              onAct={act}
-              idleText={spectating ? "Spectating" : idleText}
-              clock={heroClock}
-            />
+            {sittingOut && stage === "playing" ? (
+              <div className="flex h-[64px] items-center justify-between gap-3 rounded-xl border border-gold/50 bg-gold/[0.07] px-4 sm:h-[112px]">
+                <div>
+                  <div className="font-display text-[15px] font-semibold text-gold">You&apos;re sitting out</div>
+                  <div className="text-[12px] text-text-secondary">
+                    Your clock ran out. Until you return, you check when you can and fold to bets.
+                  </div>
+                </div>
+                <button
+                  onClick={comeBack}
+                  autoFocus
+                  className="shrink-0 rounded-lg bg-gold px-4 py-2.5 font-display text-[14px] font-semibold text-surface-primary transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                >
+                  I&apos;m back
+                </button>
+              </div>
+            ) : (
+              <ActionBar
+                legal={heroLegal}
+                pot={pot}
+                currentBet={game.currentBet}
+                bigBlind={game.blinds.bb}
+                preflop={game.street === "preflop"}
+                onAct={act}
+                idleText={spectating ? "Spectating" : idleText}
+                clock={heroClock}
+              />
+            )}
           </div>
           {showResult && (
             <ResultOverlay
