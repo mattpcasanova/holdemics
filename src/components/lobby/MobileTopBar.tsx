@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { Avatar } from "@/components/ui/Avatar";
 import { SettingsButton } from "@/components/ui/SettingsDialog";
+import type { Profile } from "@/lib/account";
+import { supabaseConfigured } from "@/lib/supabase/config";
 
 /** Compact header replacing the nav rail on small screens. */
-export function MobileTopBar() {
+export function MobileTopBar({ profile }: { profile: Profile | null }) {
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-surface-deep px-4 md:hidden">
       <Link href="/" className="flex items-center gap-2">
@@ -14,6 +17,17 @@ export function MobileTopBar() {
           Practice
         </Link>
         <SettingsButton className="rounded-md px-2.5 py-1.5 text-[13px] text-text-secondary hover:bg-white/5">Settings</SettingsButton>
+        {profile ? (
+          <span className="ml-1" title={profile.username}>
+            <Avatar name={profile.username} size={28} />
+          </span>
+        ) : (
+          supabaseConfigured && (
+            <Link href="/login" className="ml-1 rounded-md bg-gold px-2.5 py-1.5 text-[13px] font-semibold text-surface-primary">
+              Sign in
+            </Link>
+          )
+        )}
       </div>
     </header>
   );

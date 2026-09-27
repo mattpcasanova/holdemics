@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { recordPracticeGame } from "@/app/practice/actions";
 import { SettingsButton } from "@/components/ui/SettingsDialog";
 import { SoundToggle } from "@/components/ui/SoundToggle";
 import { HERO, usePracticeGame } from "@/hooks/usePracticeGame";
@@ -44,6 +45,15 @@ function PracticeTableInner({ mode, level, onPlayAgain }: PracticeTableProps & {
     skipToResults,
   } = usePracticeGame(mode, level);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Save the result once the hero's finishing place is known (knocked out, or the game ends).
+  const heroPlace = game.players[HERO].place;
+  const recorded = useRef(false);
+  useEffect(() => {
+    if (recorded.current || heroPlace === null || !showResult) return;
+    recorded.current = true;
+    void recordPracticeGame({ mode, botLevel: level, place: heroPlace, players: game.players.length, hands: game.handNumber });
+  }, [heroPlace, showResult, mode, level, game.players.length, game.handNumber]);
   const config = MODES[mode];
   const handsLeft = game.handsLeftInLevel;
   const heroClock =

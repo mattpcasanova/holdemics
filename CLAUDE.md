@@ -9,7 +9,7 @@ Placement poker with a chess.com-style rating ladder and TFT-style scoring. Ever
 - **Styling**: Tailwind CSS v4 + CSS custom properties (`src/app/globals.css`)
 - **Fonts**: Inter (body), Bricolage Grotesque (display)
 - **Tests**: Vitest (`*.test.ts` next to the code)
-- **Database/Auth**: Supabase (scaffolded, not wired)
+- **Database/Auth**: Supabase (email/password auth via `@supabase/ssr`; schema in `supabase/migrations/`). Project lives in a Free-plan org during development; move to the Pro org at launch.
 - **Hosting**: Vercel
 
 ## Key Directories
@@ -66,6 +66,15 @@ npm run simulate -- standard 100     # Bot sims: hands/game and avg place per di
 - Players busting on the same hand: bigger starting stack gets the better place.
 - Incomplete all-in raises do not reopen raising for players who already acted.
 
+## Accounts & Data
+
+- **Env**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (see `.env.local.example`). Without them the app runs guest-only (`supabaseConfigured` in `src/lib/supabase/config.ts`).
+- **Session**: `src/proxy.ts` (Next 16's renamed middleware) refreshes the auth cookie via `getClaims()`. Server code uses `getViewer()` from `src/lib/supabase/server.ts`; never trust `getSession()` user data for authorization.
+- **Tables**: `profiles` (public read, own update of username/avatar), `ratings` (per mode, public read, server-only writes), `user_settings` (jsonb), `player_notes` (private), `practice_games` (own history). All RLS-enabled with `(select auth.uid())` ownership checks.
+- **Signup**: `private.handle_new_user()` trigger creates profile + 3 rating rows + settings. The requested username comes from signup metadata (user-editable), so it is sanitized and de-duplicated in the trigger and only used as a display name.
+- **Sync**: `AccountSync` (mounted in the root layout) loads settings/notes on sign-in (account wins, guest-only data is uploaded) and saves changes back with a debounce. Local stores stay the source of truth for the UI.
+- **Email confirm**: `/auth/confirm` accepts both `?code=` (default PKCE link) and `?token_hash=&type=`. Add the dev URL to Auth → URL Configuration redirect allow list.
+
 ## Rating
 
 Pairwise Elo (`src/lib/rating.ts`): each finish = win vs everyone below, loss vs everyone above. Pairwise K = 70/(n-1) for 8-max, 32 for heads-up; doubled for the first 20 games (provisional). Even 8-player lobby → +35/+25/+15/+5/−5/−15/−25/−35, varying with lobby strength. Separate rating per mode.
@@ -84,7 +93,7 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 ## Roadmap
 
 1. ~~Engine + bots + practice mode~~ (done)
-2. Supabase auth, profiles, per-mode ratings, friends
+2. ~~Supabase auth, profiles, per-mode ratings~~ (done); friends list after private tables
 3. Server-authoritative multiplayer (hole cards must never reach other clients) — private friend tables, unrated
 4. Ranked matchmaking (rating window widens with wait time; launch Heads-Up ranked first since 8-max needs 8 concurrent players)
 5. Cosmetics (avatars, card backs, chip sets) and achievements

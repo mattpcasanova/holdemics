@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { AccountBlock } from "@/components/lobby/AccountBlock";
 import { SettingsButton } from "@/components/ui/SettingsDialog";
+import type { Profile } from "@/lib/account";
 
 const ITEMS = [
   { label: "Play", href: "/", icon: "♠", live: true },
@@ -8,7 +10,7 @@ const ITEMS = [
   { label: "Leaderboard", href: null, icon: "♣", live: false },
 ];
 
-export function NavRail({ active = "Play" }: { active?: string }) {
+export function NavRail({ active = "Play", profile }: { active?: string; profile: Profile | null }) {
   return (
     <nav
       aria-label="Main"
@@ -50,12 +52,7 @@ export function NavRail({ active = "Play" }: { active?: string }) {
         </span>
         Settings
       </SettingsButton>
-      <div className="rounded-lg border border-border p-3">
-        <div className="text-[13px] font-medium">Playing as guest</div>
-        <p className="mt-0.5 text-[11.5px] leading-snug text-text-tertiary">
-          Accounts, ratings, and friends are next on the roadmap.
-        </p>
-      </div>
+      <AccountBlock profile={profile} />
     </nav>
   );
 }
