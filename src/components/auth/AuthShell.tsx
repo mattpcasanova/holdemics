@@ -8,20 +8,21 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
       <aside
         className="relative flex flex-col overflow-hidden p-10 max-lg:hidden"
         style={{
-          // A pool of light over the table in a dark room.
-          background: "radial-gradient(ellipse 70% 55% at 50% 48%, #23272D 0%, #14171A 55%, #0B0D0F 100%)",
+          // A dark room; the scene adds its own spotlight over the table.
+          background: "radial-gradient(ellipse 80% 60% at 50% 45%, #1A1D22 0%, #101215 55%, #08090B 100%)",
         }}
       >
         <Link href="/" className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-felt text-[16px] text-gold">♠</span>
           <span className="font-display text-[20px] font-semibold tracking-tight text-white">holdemics</span>
         </Link>
-        <div className="flex flex-1 items-center justify-center py-8">
+        <div className="min-h-0 flex-1 py-6">
           <DealerScene />
         </div>
-        <div>
-          <p className="font-display text-[26px] font-semibold tracking-tight text-white">Shuffle up and deal.</p>
-          <p className="mt-1 max-w-[46ch] text-[14px] leading-relaxed text-text-secondary">
+        <div className="relative">
+          <div className="mb-4 h-px w-16 bg-gradient-to-r from-[#E5B96A] to-transparent" />
+          <p className="font-display text-[30px] font-semibold leading-tight tracking-tight text-white">Shuffle up and deal.</p>
+          <p className="mt-2 max-w-[44ch] text-[14.5px] leading-relaxed text-text-secondary">
             Eight seats, 100 HP each. Finish in the top half and your rating climbs.
           </p>
         </div>

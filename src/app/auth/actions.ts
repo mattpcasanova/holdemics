@@ -5,7 +5,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export type AuthFormState = { error?: string; checkEmail?: string } | undefined;
+export type AuthFormState =
+  | { error?: string; checkEmail?: string; values?: { username?: string; email?: string } }
+  | undefined;
 
 const USERNAME = /^[A-Za-z0-9_]{3,20}$/;
 
@@ -27,20 +29,21 @@ export async function signUp(_: AuthFormState, form: FormData): Promise<AuthForm
   const email = String(form.get("email") ?? "").trim();
   const password = String(form.get("password") ?? "");
 
-  if (!USERNAME.test(username)) return { error: "Usernames are 3–20 letters, numbers, or underscores." };
-  if (!email.includes("@")) return { error: "Enter a valid email address." };
-  if (password.length < 8) return { error: "Passwords need at least 8 characters." };
+  const values = { username, email };
+  if (!USERNAME.test(username)) return { error: "Usernames are 3–20 letters, numbers, or underscores.", values };
+  if (!email.includes("@")) return { error: "Enter a valid email address.", values };
+  if (password.length < 8) return { error: "Passwords need at least 8 characters.", values };
 
   const supabase = await createClient();
   const { data: available } = await supabase.rpc("username_available", { name: username });
-  if (available === false) return { error: `${username} is taken. Try another username.` };
+  if (available === false) return { error: `${username} is taken. Try another username.`, values };
 
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: { data: { username }, emailRedirectTo: `${await siteOrigin()}/auth/confirm` },
   });
-  if (error) return { error: error.message };
+  if (error) return { error: error.message, values };
 
   // With email confirmation on, there's no session until the link is clicked.
   if (!data.session) return { checkEmail: email };
@@ -59,6 +62,7 @@ export async function signIn(_: AuthFormState, form: FormData): Promise<AuthForm
         error.code === "email_not_confirmed"
           ? "Confirm your email first. Check your inbox for the link."
           : "That email and password don't match an account.",
+      values: { email },
     };
   }
   revalidatePath("/", "layout");

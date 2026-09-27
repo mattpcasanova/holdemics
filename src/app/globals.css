@@ -123,9 +123,9 @@ body {
   from { transform: rotateY(180deg); }
   to { transform: rotateY(0deg); }
 }
-@keyframes dealer-sweep {
-  from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.8); }
+@keyframes spot-breathe {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
 }
 @keyframes dealer-tap {
   0% { opacity: 0; transform: scale(0.3); }

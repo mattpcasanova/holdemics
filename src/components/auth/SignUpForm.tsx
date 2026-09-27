@@ -27,6 +27,7 @@ export function SignUpForm() {
       <Field
         label="Username"
         name="username"
+        defaultValue={state?.values?.username}
         autoComplete="username"
         required
         minLength={3}
@@ -34,7 +35,7 @@ export function SignUpForm() {
         pattern="[A-Za-z0-9_]{3,20}"
         hint="3–20 letters, numbers, or underscores. Shown at the table."
       />
-      <Field label="Email" name="email" type="email" autoComplete="email" required />
+      <Field label="Email" name="email" type="email" defaultValue={state?.values?.email} autoComplete="email" required />
       <Field label="Password" name="password" type="password" autoComplete="new-password" required minLength={8} hint="At least 8 characters." />
       <SubmitButton pending={pending}>{pending ? "Creating account" : "Create account"}</SubmitButton>
       <p className="text-center text-[13px] text-text-secondary">
