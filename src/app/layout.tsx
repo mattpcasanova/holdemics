@@ -14,7 +14,7 @@ const bricolage = Bricolage_Grotesque({
 
 export const metadata: Metadata = {
   title: "Holdemics",
-  description: "6-max placement poker",
+  description: "Placement poker with ratings. Eight players, 100 HP each, top four climb.",
 };
 
 export default function RootLayout({
