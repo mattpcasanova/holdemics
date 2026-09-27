@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LiveTableShowcase } from "./LiveTableShowcase";
+import { DealerScene } from "./DealerScene";
 
 /** Split layout for sign-in/sign-up: a felt panel with a fanned hand, and the form. */
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
@@ -8,21 +8,23 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
       <aside
         className="relative flex flex-col overflow-hidden p-10 max-lg:hidden"
         style={{
-          background:
-            "radial-gradient(ellipse at 40% 45%, #247C53 0%, var(--felt) 40%, var(--felt-deep) 75%, var(--felt-deepest) 100%)",
+          // A pool of light over the table in a dark room.
+          background: "radial-gradient(ellipse 70% 55% at 50% 48%, #23272D 0%, #14171A 55%, #0B0D0F 100%)",
         }}
       >
         <Link href="/" className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-surface-deep text-[16px] text-gold">♠</span>
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-felt text-[16px] text-gold">♠</span>
           <span className="font-display text-[20px] font-semibold tracking-tight text-white">holdemics</span>
         </Link>
         <div className="flex flex-1 items-center justify-center py-8">
-          <LiveTableShowcase />
+          <DealerScene />
         </div>
-        <p className="max-w-[46ch] text-[14px] leading-relaxed text-green-light-text">
-          A bot table playing down to the last HP. Everyone starts with 100. Finish in the top half and your rating
-          climbs.
-        </p>
+        <div>
+          <p className="font-display text-[26px] font-semibold tracking-tight text-white">Shuffle up and deal.</p>
+          <p className="mt-1 max-w-[46ch] text-[14px] leading-relaxed text-text-secondary">
+            Eight seats, 100 HP each. Finish in the top half and your rating climbs.
+          </p>
+        </div>
       </aside>
 
       <main className="flex items-center justify-center p-6">
