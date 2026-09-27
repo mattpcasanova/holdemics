@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Turn } from "@/hooks/usePracticeGame";
 import type { GameState } from "@/lib/engine/game";
-import { positionLabels, potTotal } from "@/lib/engine/game";
+import { buildPots, positionLabels } from "@/lib/engine/game";
 import { formatHp } from "@/lib/engine/modes";
 import { noteKey, useNotes } from "@/lib/notes";
 import type { StatsTable } from "@/lib/stats";
 import { ChipStack } from "./ChipStack";
 import { PlayerCard } from "./PlayerCard";
 import { PlayingCard } from "./PlayingCard";
+import { PotDisplay } from "./PotDisplay";
 import { Seat } from "./Seat";
 
 interface PokerTableProps {
@@ -26,7 +27,7 @@ interface PokerTableProps {
 /** Point on the table ellipse for a seat, in % of the container. Hero sits at the bottom. */
 function seatPoint(offset: number, seats: number, radius = 1) {
   const angle = ((90 + (offset * 360) / seats) * Math.PI) / 180;
-  return { x: 50 + 44 * radius * Math.cos(angle), y: 50 + 41 * radius * Math.sin(angle) };
+  return { x: 50 + 44 * radius * Math.cos(angle), y: 51 + 40 * radius * Math.sin(angle) };
 }
 
 export function PokerTable({
@@ -43,7 +44,14 @@ export function PokerTable({
   const labels = positionLabels(game);
   const result = game.phase === "complete" || game.phase === "finished" ? game.result : null;
   const collected = game.players.reduce((sum, p) => sum + p.totalBet - p.bet, 0);
-  const potShown = result ? result.pots.reduce((sum, p) => sum + p.amount, 0) : potTotal(game);
+  // Side pots only exist once someone is all in; otherwise differing bets are just the current street.
+  const anyAllIn = game.players.some((p) => p.allIn && !p.folded);
+  const pots = result
+    ? result.pots.map((p) => p.amount)
+    : anyAllIn
+      ? buildPots(game.players).map((p) => p.amount)
+      : [game.players.reduce((sum, p) => sum + p.totalBet, 0)];
+  const potShown = pots.reduce((sum, a) => sum + a, 0);
   const chipsInMiddle = result ? potShown : collected;
 
   return (
@@ -85,18 +93,14 @@ export function PokerTable({
             <div key={`slot-${i}`} className="h-[76px] w-[54px] rounded-md border border-dashed border-white/10" />
           ))}
         </div>
-        <div className="flex items-center gap-2 rounded-full bg-black/25 px-3 py-1">
-          {chipsInMiddle > 0 && <ChipStack amount={chipsInMiddle} scale={0.8} />}
-          <span className="text-[12px] text-felt-light">Pot</span>
-          <span className="font-display text-[16px] font-semibold tabular-nums text-gold">{formatHp(potShown)}</span>
-        </div>
+        <PotDisplay total={potShown} pots={pots} chips={chipsInMiddle} />
       </div>
 
       {/* Seats, bets, dealer button */}
       {game.players.map((player, i) => {
         const offset = (i - heroIndex + n) % n;
         const seat = seatPoint(offset, n);
-        const bet = seatPoint(offset, n, offset === 0 ? 0.36 : 0.66);
+        const bet = offset === 0 ? seatPoint(0, n, 0.44) : betPoint(seat);
         const dealer = seatPoint(offset + 0.32, n, 0.7);
         const isHero = i === heroIndex;
         const showCards =
@@ -116,14 +120,16 @@ export function PokerTable({
         }
 
         return (
-          <div key={player.id} style={{ animation: game.handNumber === 0 ? "seat-in 320ms ease-out both" : undefined }}>
+          <div key={player.id}>
             {player.bet > 0 && (
               <div
-                className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1"
+                className={`absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-end gap-1.5 ${
+                  seat.x > 55 ? "flex-row-reverse" : ""
+                }`}
                 style={{ left: `${bet.x}%`, top: `${bet.y}%` }}
               >
-                <ChipStack amount={player.bet} scale={0.75} />
-                <span className="rounded bg-black/35 px-1.5 text-[11px] font-medium tabular-nums text-text-primary">
+                <ChipStack amount={player.bet} scale={1.5} />
+                <span className="mb-0.5 rounded-md border border-white/10 bg-black/50 px-1.5 py-px font-display text-[12px] font-semibold tabular-nums text-text-primary shadow">
                   {formatHp(player.bet)}
                 </span>
               </div>
@@ -137,10 +143,7 @@ export function PokerTable({
                 D
               </div>
             )}
-            <div
-              className={`absolute ${isHero ? "z-40" : "z-30"} -translate-x-1/2 -translate-y-1/2`}
-              style={{ left: `${seat.x}%`, top: `${seat.y}%` }}
-            >
+            <SeatMover to={seat} className={isHero ? "z-40" : "z-30"}>
               <Seat
                 player={player}
                 isHero={isHero}
@@ -159,7 +162,7 @@ export function PokerTable({
                     : null
                 }
               />
-            </div>
+            </SeatMover>
           </div>
         );
       })}
@@ -178,6 +181,44 @@ export function PokerTable({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Where a seat's bet sits. Placed relative to the seat box (not radially) so
+ * chips clear both the seat and the board: below top seats, beside side
+ * seats, and diagonally inward from bottom seats.
+ */
+function betPoint(seat: { x: number; y: number }) {
+  const dy = seat.y - 51;
+  const toward = Math.sign(50 - seat.x);
+  if (Math.abs(dy) < 12) return { x: seat.x + toward * 14, y: seat.y };
+  if (dy < 0) return { x: seat.x + toward * 5, y: seat.y + 14 };
+  return { x: seat.x + toward * 11, y: seat.y - 11 };
+}
+
+/** Seats start at the dealer's spot and glide out to their chair when the player sits down. */
+function SeatMover({ to, className, children }: { to: { x: number; y: number }; className: string; children: React.ReactNode }) {
+  const [arrived, setArrived] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setArrived(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const pos = arrived ? to : { x: 50, y: 42 };
+  return (
+    <div
+      className={`absolute -translate-x-1/2 -translate-y-1/2 ${className}`}
+      style={{
+        left: `${pos.x}%`,
+        top: `${pos.y}%`,
+        opacity: arrived ? 1 : 0,
+        scale: arrived ? "1" : "0.55",
+        transition:
+          "left 650ms cubic-bezier(0.22, 1, 0.36, 1), top 650ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease-out, scale 650ms cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
+    >
+      {children}
     </div>
   );
 }

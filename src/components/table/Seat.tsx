@@ -87,8 +87,8 @@ export function Seat({
     <div className={`relative flex flex-col items-center ${isHero ? "w-[176px]" : "w-[148px]"}`}>
       {/* Hole cards */}
       <div
-        className={`relative z-0 flex items-end justify-center ${isHero ? "gap-1.5 -mb-2" : "gap-1 -mb-3"}`}
-        style={{ height: isHero ? 92 : revealed ? 59 : 39 }}
+        className={`relative z-0 flex items-end justify-center ${isHero ? "gap-1.5 -mb-2" : "gap-0.5 -mb-4"}`}
+        style={{ height: isHero ? 92 : 62 }}
       >
         {dealt &&
           (revealed
@@ -103,7 +103,10 @@ export function Seat({
                 />
               ))
             : [0, 1].map((i) => (
-                <PlayingCard key={`${handNumber}-${i}`} faceDown size="xs" dimmed={player.folded} dealDelay={i * 60} />
+                // Fan the face-down pair slightly so it reads as a hand, not two tiles.
+                <div key={`${handNumber}-${i}`} style={{ rotate: `${i === 0 ? -8 : 8}deg`, translate: `${i === 0 ? 5 : -5}px 3px` }}>
+                  <PlayingCard faceDown size="sm" dimmed={player.folded} dealDelay={i * 60} />
+                </div>
               )))}
       </div>
 

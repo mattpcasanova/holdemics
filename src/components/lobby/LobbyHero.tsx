@@ -90,10 +90,10 @@ export function LobbyHero() {
             ))}
           </div>
 
-          <h1 id="hero-heading" className="font-display text-[40px] font-semibold leading-[1.05] tracking-[-0.02em]">
+          <h1 id="hero-heading" className="min-h-[3.15em] font-display text-[40px] font-semibold leading-[1.05] tracking-[-0.02em]">
             {mode.seats === 2 ? "Two players. One survives." : "Eight players. One table. Top four climb."}
           </h1>
-          <p className="mt-3 max-w-[46ch] text-[14px] leading-relaxed text-text-secondary">
+          <p className="mt-3 min-h-[4.9em] max-w-[46ch] text-[14px] leading-relaxed text-text-secondary">
             Everyone starts with {STARTING_HP} HP, and your HP is your stack. Blinds climb {describeLevelLength(mode)} until one
             player holds it all. Your rating moves on where you finish.
           </p>
