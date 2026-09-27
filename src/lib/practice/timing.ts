@@ -21,3 +21,8 @@ export const FLIP_SOUND_OFFSET_MS = 140;
 export function boardFlipDelay(i: number): number {
   return BOARD_FLIP_DELAY_MS + (i < 3 ? i * BOARD_FLIP_STAGGER_MS : 0);
 }
+
+/** Pot push: how long the pot sits after a hand ends, then how long the chips take to reach the winner. */
+export const POT_HOLD_SHOWDOWN_MS = 900;
+export const POT_HOLD_UNCONTESTED_MS = 300;
+export const POT_MOVE_MS = 650;

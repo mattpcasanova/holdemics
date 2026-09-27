@@ -135,6 +135,7 @@ function PracticeTableInner({ mode, level, onPlayAgain }: PracticeTableProps & {
               clock={clock}
               runout={runout}
               heroSittingOut={sittingOut}
+              fast={spectating}
               botLabel={`${BOT_LEVELS[level].name} bot`}
             />
           </div>

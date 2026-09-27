@@ -74,7 +74,10 @@ function runToEnd(state: GameState, level: BotLevel): GameState {
   return s;
 }
 
-/** Sounds for newly appended log events. Runout streets and wins are played by the reveal instead. */
+/**
+ * Sounds for newly appended log events. Runout streets are cued by the reveal,
+ * and the win sound plays with the pot-push animation on the table.
+ */
 function soundsFor(events: LogEvent[], state: GameState, runout: boolean) {
   for (const e of events) {
     let name: SoundName | null = null;
@@ -97,9 +100,6 @@ function soundsFor(events: LogEvent[], state: GameState, runout: boolean) {
             play("flip", boardFlipDelay(i) + FLIP_SOUND_OFFSET_MS);
           });
         }
-        break;
-      case "win":
-        if (!runout) name = "win";
         break;
     }
     if (name) play(name);
@@ -198,7 +198,6 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
         const rest = h.length && h[h.length - 1].hand === game.handNumber ? h.slice(0, -1) : h;
         return [...rest, { hand: game.handNumber, events: game.log }].slice(-12);
       });
-      play("win");
     }, Math.max(0, doneAt - elapsed));
     return () => clearTimeout(t);
     // Only re-run when a new runout starts.

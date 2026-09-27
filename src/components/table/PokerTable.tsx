@@ -9,7 +9,14 @@ import { type GameState, buildPots, positionLabels } from "@/lib/engine/game";
 import { formatHp } from "@/lib/engine/modes";
 import { noteKey, useNotes } from "@/lib/notes";
 import { runoutSchedule } from "@/lib/practice/runout";
-import { BOARD_DEAL_STAGGER_MS, boardFlipDelay } from "@/lib/practice/timing";
+import { play } from "@/lib/audio";
+import {
+  BOARD_DEAL_STAGGER_MS,
+  POT_HOLD_SHOWDOWN_MS,
+  POT_HOLD_UNCONTESTED_MS,
+  POT_MOVE_MS,
+  boardFlipDelay,
+} from "@/lib/practice/timing";
 import type { StatsTable } from "@/lib/stats";
 import { ChipStack } from "./ChipStack";
 import { FlipCard } from "./FlipCard";
@@ -26,6 +33,8 @@ interface PokerTableProps {
   clock?: { turn: Turn | null; decisionMs: number; bankMs: number } | null;
   runout?: Runout | null;
   heroSittingOut?: boolean;
+  /** Skip the pot-push animation (spectating at speed). */
+  fast?: boolean;
   /** Label for bot players, e.g. "Regular bot". */
   botLabel?: string;
 }
@@ -136,6 +145,7 @@ export function PokerTable({
   clock,
   runout,
   heroSittingOut = false,
+  fast = false,
   botLabel = "Bot",
 }: PokerTableProps) {
   const [selected, setSelected] = useState<{ index: number; anchor: HTMLElement } | null>(null);
@@ -174,7 +184,17 @@ export function PokerTable({
       ? buildPots(game.players).map((p) => p.amount)
       : [game.players.reduce((sum, p) => sum + p.totalBet, 0)];
   const potShown = pots.reduce((sum, a) => sum + a, 0);
-  const chipsInMiddle = result ? potShown : collected;
+
+  // Pot push: once the result is showing, the pot slides to each winner.
+  const winners = result && !runout ? Object.entries(result.payouts).map(([i, amount]) => ({ index: Number(i), amount })) : [];
+  const push = usePotPush(
+    winners.length ? `${game.handNumber}` : null,
+    result?.showdown ? POT_HOLD_SHOWDOWN_MS : POT_HOLD_UNCONTESTED_MS,
+    fast,
+  );
+  const potGone = winners.length > 0 && push !== "holding";
+  const chipsInMiddle = potGone ? 0 : result ? potShown : collected;
+  const potPoint: Point = { x: 50, y: stage.boardTop + (portrait ? 2.1 : 4.4) };
 
   // Deal order starts left of the button and goes around twice.
   const dealOrder: number[] = [];
@@ -245,8 +265,34 @@ export function PokerTable({
               );
             })}
           </div>
-          <PotDisplay total={potShown} pots={pots} chips={chipsInMiddle} />
+          <div className="transition-opacity duration-300" style={{ opacity: push === "done" ? 0 : 1 }}>
+            <PotDisplay total={potShown} pots={pots} chips={chipsInMiddle} />
+          </div>
         </div>
+
+        {/* Pot chips on their way to the winner(s) */}
+        {winners.map((w) => {
+          const target = layout[(w.index - heroIndex + n) % n];
+          const moving = push !== "holding";
+          const pos = moving ? target : potPoint;
+          return (
+            <div
+              key={`push-${game.handNumber}-${w.index}`}
+              aria-hidden
+              className="pointer-events-none absolute z-[46] -translate-x-1/2 -translate-y-1/2"
+              style={{
+                left: `${pos.x}%`,
+                top: `${pos.y}%`,
+                opacity: push === "done" ? 0 : 1,
+                scale: push === "done" ? "0.7" : "1",
+                transition: `left ${POT_MOVE_MS}ms cubic-bezier(0.5, 0, 0.2, 1), top ${POT_MOVE_MS}ms cubic-bezier(0.5, 0, 0.2, 1), opacity 250ms ease-in, scale 250ms ease-in`,
+                visibility: push === "holding" ? "hidden" : "visible",
+              }}
+            >
+              <ChipStack amount={w.amount} scale={1.5} layout="pile" maxStacks={4} />
+            </div>
+          );
+        })}
 
         {/* Seats, bets, dealer button */}
         {game.players.map((player, i) => {
@@ -314,7 +360,8 @@ export function PokerTable({
               )}
               <SeatMover to={seat} className={isHero ? "z-40" : "z-30"}>
                 <Seat
-                  player={player}
+                  // Winners' stacks count up when the chips land, not before.
+                  player={pushedPlayer(player, winners.find((w) => w.index === i)?.amount ?? 0, push === "done")}
                   isHero={isHero}
                   sittingOut={isHero && heroSittingOut}
                   isActing={game.toAct === i}
@@ -353,6 +400,33 @@ export function PokerTable({
       )}
     </div>
   );
+}
+
+type PushPhase = "holding" | "moving" | "done";
+
+/** Drives the pot push for one hand: hold on the pot, slide to the winner, then land. */
+function usePotPush(key: string | null, holdMs: number, fast: boolean): PushPhase {
+  const [state, setState] = useState<{ key: string; phase: PushPhase } | null>(null);
+  useEffect(() => {
+    if (!key) return;
+    const hold = fast ? 0 : holdMs;
+    const move = fast ? 0 : POT_MOVE_MS;
+    const timers = [
+      setTimeout(() => {
+        setState({ key, phase: "moving" });
+        if (!fast) play("win");
+      }, hold),
+      setTimeout(() => setState({ key, phase: "done" }), hold + move),
+    ];
+    return () => timers.forEach(clearTimeout);
+    // A new hand (key) starts a new push; timing props don't restart one in flight.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return state?.key === key ? state.phase : "holding";
+}
+
+function pushedPlayer(player: GameState["players"][number], won: number, landed: boolean) {
+  return won && !landed ? { ...player, stack: player.stack - won } : player;
 }
 
 /** Seats start at the dealer's spot and glide out to their chair when the player sits down. */
