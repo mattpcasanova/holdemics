@@ -123,24 +123,48 @@ body {
   from { transform: rotateY(180deg); }
   to { transform: rotateY(0deg); }
 }
-@keyframes spot-breathe {
-  0%, 100% { opacity: 0.85; }
-  50% { opacity: 1; }
-}
 @keyframes dealer-tap {
   0% { opacity: 0; transform: scale(0.3); }
   15% { opacity: 0.9; }
   100% { opacity: 0; transform: scale(2.2); }
 }
-@keyframes riffle-left {
-  0%, 100% { transform: none; }
-  30%, 55% { transform: translateX(-30px) rotate(-10deg); }
-  85% { transform: translateX(-3px); }
+/* Folded hole cards go to the muck and vanish into it. */
+@keyframes fold-out {
+  0% { opacity: 1; transform: none; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--mx), var(--my)) scale(0.9); }
 }
-@keyframes riffle-right {
-  0%, 100% { transform: none; }
-  30%, 55% { transform: translateX(30px) rotate(10deg); }
-  85% { transform: translateX(3px); }
+/* Bets gather into the pot, and the pot slides to the winner. */
+@keyframes bet-collect {
+  from { transform: none; }
+  to { transform: translate(var(--cx), var(--cy)); }
+}
+@keyframes pot-push {
+  from { transform: translate(var(--cx), var(--cy)); }
+  to { transform: translate(var(--wx), var(--wy)); }
+}
+/* Everything returns to the dealer between hands. */
+@keyframes dealer-sweep {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.85); }
+}
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+/* Riffle: the deck splits, each card falls back in from its half, then the deck squares up. */
+@keyframes riffle-card {
+  0% { transform: none; }
+  18%, 50% { transform: translate(var(--sx), 0) rotate(var(--rot)); }
+  66% { transform: translate(calc(var(--sx) * 0.25), -7px) rotate(calc(var(--rot) * 0.3)); }
+  78% { transform: translate(2px, 0); }
+  88% { transform: translate(-2px, 0); }
+  100% { transform: none; }
+}
+/* Strip cut: the top half lifts and drops to the bottom. */
+@keyframes strip-cut {
+  0% { transform: none; }
+  45% { transform: translate(24px, -14px) rotate(6deg); }
+  100% { transform: translate(0, 3px); }
 }
 @keyframes seat-in {
   from { opacity: 0; transform: scale(0.94); }

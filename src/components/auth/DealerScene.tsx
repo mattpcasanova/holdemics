@@ -6,33 +6,71 @@ import { PlayingCard } from "@/components/table/PlayingCard";
 import type { Card } from "@/lib/engine/cards";
 
 /**
- * The deal, seen from the dealer's chair, played once: the deck riffles,
- * two cards are pitched to each seat, the dealer taps the felt, burns, and
- * lays out the flop, turn, and river. Then the hand rests on the table.
- * Everything is CSS animation on a tilted plane under a spotlight.
+ * One hand from the dealer's chair, on a slow loop: riffle and strip the
+ * deck, post blinds, pitch two cards to every seat, the action goes round
+ * (folds to the muck, calls and a raise pushed in), bets are collected,
+ * the board comes out street by street, the pot goes to the winner, the
+ * hand rests, and everything sweeps back to the dealer. Pure CSS
+ * animations on a tilted plane; every element's timeline is a list of
+ * chained animations, later ones (`forwards`) taking over from earlier.
  */
 
 const W = 640;
 const H = 420;
 const TILT = 54;
+const CENTER = { x: W / 2, y: 210 };
 const DEALER = { x: 320, y: 372 };
 const DECK = { x: 268, y: 352 };
 const MUCK = { x: 372, y: 352 };
+const POT = { x: 320, y: 268 };
 const CARD = { w: 42, h: 59 };
 const BOARD_CARD = { w: 56, h: 78 };
-const BOARD_Y = 200;
+const BOARD_Y = 196;
 const boardX = (i: number) => W / 2 + (i - 2) * 64;
 
-// Timeline (ms).
-const DEAL_START = 1400;
-const DEAL_STAGGER = 85;
-const TAPS = [3400, 5900, 7800];
-const FLOP_AT = 3900;
-const FLOP_FLIP = 4750;
-const TURN_AT = 6350;
-const TURN_FLIP = 6900;
-const RIVER_AT = 8250;
-const RIVER_FLIP = 9050;
+// ─── Timeline (ms) ───────────────────────────────────────
+const BLINDS_AT = 1500;
+const DEAL_START = 1850;
+const DEAL_STAGGER = 80;
+const PREFLOP: Action[] = [
+  { seat: 2, at: 3350, kind: "fold" },
+  { seat: 3, at: 3600, kind: "bet", amount: 90 },
+  { seat: 4, at: 3850, kind: "bet", amount: 90 },
+  { seat: 5, at: 4100, kind: "fold" },
+  { seat: 6, at: 4350, kind: "bet", amount: 90 },
+  { seat: 0, at: 4600, kind: "fold" },
+  { seat: 1, at: 4850, kind: "bet", amount: 90 },
+];
+const COLLECT_1 = 5450;
+const TAP_1 = 5900;
+const FLOP_AT = 6300;
+const FLOP_FLIP = 7150;
+const FLOP_BETS: Action[] = [
+  { seat: 3, at: 8300, kind: "bet", amount: 240 },
+  { seat: 4, at: 8650, kind: "bet", amount: 240 },
+  { seat: 6, at: 9000, kind: "fold" },
+  { seat: 1, at: 9200, kind: "fold" },
+];
+const COLLECT_2 = 9600;
+const TAP_2 = 9950;
+const TURN_AT = 10350;
+const TURN_FLIP = 10900;
+const TAP_3 = 11750;
+const RIVER_AT = 12150;
+const RIVER_FLIP = 12950;
+const PUSH_AT = 14400;
+const WINNER = 4;
+const SWEEP_AT = 17600;
+const LOOP_MS = 18500;
+
+const BURNS = [TAP_1, TAP_2, TAP_3];
+
+interface Action {
+  seat: number;
+  at: number;
+  kind: "fold" | "bet";
+  amount?: number;
+}
 
 /** A Broadway straight, one of every suit, so the deck colours all show. */
 const BOARD: Card[] = [
@@ -43,16 +81,31 @@ const BOARD: Card[] = [
   { rank: 10, suit: "s" },
 ];
 
-const CHIPS = [740, 1180, 965, 1310, 520, 885, 1045];
-
 /** Seven seats around the far side; the dealer sits at the bottom. */
 const SEATS = Array.from({ length: 7 }, (_, k) => {
   const angle = ((165 + (k * 210) / 6) * Math.PI) / 180;
-  return { x: W / 2 + 250 * Math.cos(angle), y: 210 + 158 * Math.sin(angle), angle };
+  return { x: CENTER.x + 250 * Math.cos(angle), y: CENTER.y + 158 * Math.sin(angle), angle };
 });
 
-function offset(from: { x: number; y: number }, to: { x: number; y: number }) {
-  return { "--dx": `${from.x - to.x}px`, "--dy": `${from.y - to.y}px` } as React.CSSProperties;
+type Point = { x: number; y: number };
+
+/** Where a seat's chips land when bet: a little way in from the cards. */
+function betSpot(seat: number): Point {
+  const s = SEATS[seat];
+  return { x: s.x - Math.cos(s.angle) * 70, y: s.y - Math.sin(s.angle) * 56 };
+}
+
+function vars(entries: Record<string, Point>): React.CSSProperties {
+  const out: Record<string, string> = {};
+  for (const [name, p] of Object.entries(entries)) {
+    out[`--${name}x`] = `${p.x}px`;
+    out[`--${name}y`] = `${p.y}px`;
+  }
+  return out as React.CSSProperties;
+}
+
+function delta(from: Point, to: Point): Point {
+  return { x: from.x - to.x, y: from.y - to.y };
 }
 
 function at(x: number, y: number, size = CARD): React.CSSProperties {
@@ -63,32 +116,74 @@ const FELT_NOISE =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
 const SHADOW = "drop-shadow(0 6px 5px rgba(0,0,0,0.45))";
+const EASE_OUT = "cubic-bezier(0.2, 0.8, 0.3, 1)";
+const EASE_IN = "cubic-bezier(0.5, 0, 0.75, 0)";
 
-/** A board card that lands face down and turns over. */
+/** The deck, shuffled once at the start of each hand. */
+function Deck({ reduced }: { reduced: boolean }) {
+  return (
+    <div className="absolute" style={{ ...at(DECK.x, DECK.y), filter: SHADOW }}>
+      {Array.from({ length: 8 }).map((_, i) => {
+        const left = i % 2 === 0;
+        return (
+          <div
+            key={i}
+            className="absolute inset-0"
+            style={
+              {
+                translate: `0 ${-i * 1.2}px`,
+                "--sx": `${left ? -30 : 30}px`,
+                "--rot": `${left ? -9 : 9}deg`,
+                // Riffle: split, hold, then cards fall back in alternating from each half.
+                animation: reduced
+                  ? undefined
+                  : `riffle-card 1150ms ease-in-out ${i * 40}ms both${i >= 4 ? ", strip-cut 420ms ease-in-out 1250ms both" : ""}`,
+              } as React.CSSProperties
+            }
+          >
+            <PlayingCard faceDown size="sm" />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function BoardCard({
   card,
-  x,
-  y,
-  flipDelay,
+  index,
+  dealAt,
+  flipAt,
   slow,
-  style,
   reduced,
 }: {
   card: Card;
-  x: number;
-  y: number;
-  flipDelay: number;
+  index: number;
+  dealAt: number;
+  flipAt: number;
   slow?: boolean;
-  style: React.CSSProperties;
   reduced: boolean;
 }) {
+  const pos = { x: boardX(index), y: BOARD_Y };
+  const isFlop = index < 3;
   return (
-    <div className="absolute" style={{ ...at(x, y, BOARD_CARD), ...style, transformStyle: "preserve-3d", filter: SHADOW }}>
+    <div
+      className="absolute"
+      style={{
+        ...at(pos.x, pos.y, BOARD_CARD),
+        ...vars({ d: delta(DECK, pos), p: { x: boardX(0) - pos.x, y: 0 } }),
+        transformStyle: "preserve-3d",
+        filter: SHADOW,
+        animation: reduced
+          ? undefined
+          : `${isFlop ? "flop-deal 850ms" : "dealer-slide 480ms"} ${EASE_OUT} ${dealAt}ms both, dealer-sweep 600ms ${EASE_IN} ${SWEEP_AT + index * 40}ms forwards`,
+      }}
+    >
       <div
         className="relative h-full w-full"
         style={{
           transformStyle: "preserve-3d",
-          animation: reduced ? undefined : `dealer-flip ${slow ? 950 : 460}ms cubic-bezier(0.3, 0.7, 0.2, 1) ${flipDelay}ms both`,
+          animation: reduced ? undefined : `dealer-flip ${slow ? 950 : 460}ms cubic-bezier(0.3, 0.7, 0.2, 1) ${flipAt}ms both`,
         }}
       >
         <div className="absolute inset-0" style={{ backfaceVisibility: "hidden" }}>
@@ -102,15 +197,43 @@ function BoardCard({
   );
 }
 
+/** Chips pushed in as a bet, collected to the pot, and finally pushed to the winner. */
+function Bet({ seat, amount, betAt, collectAt, reduced }: { seat: number; amount: number; betAt: number; collectAt: number; reduced: boolean }) {
+  if (reduced) return null;
+  const spot = betSpot(seat);
+  const from = SEATS[seat];
+  const winner = betSpot(WINNER);
+  // Spread the collected bets a little so the pot reads as a cluster, not one blob.
+  const potSpot = { x: POT.x + (seat - 3) * 14, y: POT.y + (seat % 2) * 6 };
+  return (
+    <div
+      className="absolute flex items-end justify-center"
+      style={{
+        left: spot.x - 36,
+        top: spot.y - 48,
+        width: 72,
+        height: 48,
+        ...vars({ d: delta(from, spot), c: delta(potSpot, spot), w: delta(winner, spot) }),
+        animation: `dealer-slide 420ms ${EASE_OUT} ${betAt}ms both, bet-collect 520ms ${EASE_IN} ${collectAt}ms forwards, pot-push 650ms ${EASE_OUT} ${PUSH_AT}ms forwards, fade-out 400ms ease-in ${SWEEP_AT}ms forwards`,
+      }}
+    >
+      <div className="flex items-end justify-center" style={{ transform: `rotateX(-${TILT}deg)`, transformOrigin: "50% 100%" }}>
+        <div className="absolute bottom-[-6px] h-3 w-[56px] rounded-[50%] bg-black/50 blur-[3px]" />
+        <ChipStack amount={amount} scale={2} maxStacks={2} />
+      </div>
+    </div>
+  );
+}
+
 export function DealerScene() {
   const wrapper = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
   const [reduced, setReduced] = useState(false);
+  const [cycle, setCycle] = useState(0);
 
   useLayoutEffect(() => {
     const el = wrapper.current;
     if (!el) return;
-    // Fit the projected table to both the width and the height on offer.
     const ro = new ResizeObserver(([e]) => {
       const byWidth = e.contentRect.width / (W + 40);
       // A collapsed height means the container isn't sized yet; fit to width alone.
@@ -122,11 +245,21 @@ export function DealerScene() {
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches), 0);
-    return () => clearTimeout(t);
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const t0 = setTimeout(() => setReduced(mq.matches), 0);
+    if (mq.matches) return () => clearTimeout(t0);
+    // Restart the hand each loop; skip while the tab is hidden so it resumes mid-rest, not mid-deal.
+    const t = setInterval(() => {
+      if (!document.hidden) setCycle((c) => c + 1);
+    }, LOOP_MS);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(t);
+    };
   }, []);
 
   const anim = (value: string) => (reduced ? undefined : value);
+  const foldAt = (seat: number) => [...PREFLOP, ...FLOP_BETS].find((a) => a.seat === seat && a.kind === "fold")?.at;
 
   return (
     <div ref={wrapper} className="relative flex h-full w-full items-center" aria-hidden>
@@ -143,6 +276,7 @@ export function DealerScene() {
         <div className="absolute left-0 top-0 origin-top-left" style={{ width: W, height: H, scale: String(scale) }}>
           <div className="relative" style={{ width: W, height: H, perspective: 1200, perspectiveOrigin: "50% 8%" }}>
             <div
+              key={cycle}
               className="absolute left-0 top-0"
               style={{ width: W, height: H, transform: `rotateX(${TILT}deg)`, transformOrigin: "50% 0%", transformStyle: "preserve-3d" }}
             >
@@ -182,22 +316,6 @@ export function DealerScene() {
                 </div>
               </div>
 
-              {/* Chip stacks stand upright in front of each seat */}
-              {SEATS.map((s, k) => {
-                const cx = s.x - Math.cos(s.angle) * 46;
-                const cy = s.y - Math.sin(s.angle) * 40;
-                return (
-                  <div
-                    key={`chips-${k}`}
-                    className="absolute flex items-end justify-center"
-                    style={{ left: cx - 36, top: cy - 48, width: 72, height: 48, transform: `rotateX(-${TILT}deg)`, transformOrigin: "50% 100%" }}
-                  >
-                    <div className="absolute bottom-[-6px] h-3 w-[60px] rounded-[50%] bg-black/50 blur-[3px]" />
-                    <ChipStack amount={CHIPS[k]} scale={1.2} maxStacks={3} />
-                  </div>
-                );
-              })}
-
               {/* Dealer button by the last seat */}
               <div
                 className="absolute flex h-6 w-6 items-center justify-center rounded-full bg-[#F4F1EA] font-display text-[11px] font-bold text-[#1A1D21]"
@@ -207,7 +325,7 @@ export function DealerScene() {
               </div>
 
               {/* Tap ripples */}
-              {TAPS.map((t) => (
+              {BURNS.map((t) => (
                 <div
                   key={`tap-${t}`}
                   className="absolute rounded-full border-2 border-[#E5B96A]/80"
@@ -215,35 +333,38 @@ export function DealerScene() {
                 />
               ))}
 
-              {/* Deck: riffles once, then sits by the dealer */}
-              <div className="absolute" style={{ ...at(DECK.x, DECK.y), filter: SHADOW }}>
-                {[0, 1].map((half) => (
-                  <div key={half} className="absolute inset-0" style={{ animation: anim(`${half ? "riffle-right" : "riffle-left"} 1100ms ease-in-out 150ms both`) }}>
-                    {[0, 1, 2, 3].map((d) => (
-                      <div key={d} className="absolute inset-0" style={{ translate: `0 ${-d * 1.4}px` }}>
-                        <PlayingCard faceDown size="sm" />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+              <Deck reduced={reduced} />
 
-              {/* Two cards pitched to every seat */}
+              {/* Blinds, then the betting rounds */}
+              <Bet seat={0} amount={15} betAt={BLINDS_AT} collectAt={COLLECT_1} reduced={reduced} />
+              <Bet seat={1} amount={30} betAt={BLINDS_AT + 180} collectAt={COLLECT_1} reduced={reduced} />
+              {PREFLOP.filter((a) => a.kind === "bet").map((a) => (
+                <Bet key={`pre-${a.seat}`} seat={a.seat} amount={a.amount!} betAt={a.at} collectAt={COLLECT_1} reduced={reduced} />
+              ))}
+              {FLOP_BETS.filter((a) => a.kind === "bet").map((a) => (
+                <Bet key={`flop-${a.seat}`} seat={a.seat} amount={a.amount!} betAt={a.at} collectAt={COLLECT_2} reduced={reduced} />
+              ))}
+
+              {/* Two cards pitched to every seat; folded hands slide to the muck */}
               {[0, 1].flatMap((round) =>
                 SEATS.map((s, k) => {
                   const n = round * SEATS.length + k;
                   const along = round ? 10 : -10;
                   const pos = { x: s.x - Math.sin(s.angle) * along, y: s.y + Math.cos(s.angle) * along };
                   const rot = (s.angle * 180) / Math.PI + 90 + (round ? 7 : -7);
+                  const fold = foldAt(k);
+                  const after = fold
+                    ? `fold-out 500ms ${EASE_IN} ${fold + round * 60}ms forwards`
+                    : `dealer-sweep 600ms ${EASE_IN} ${SWEEP_AT + n * 25}ms forwards`;
                   return (
                     <div
                       key={`hole-${n}`}
                       className="absolute"
                       style={{
                         ...at(pos.x, pos.y),
-                        ...offset(DECK, pos),
+                        ...vars({ d: delta(DECK, pos), m: delta(MUCK, pos) }),
                         filter: SHADOW,
-                        animation: anim(`dealer-pitch 600ms cubic-bezier(0.12, 0.75, 0.2, 1) ${DEAL_START + n * DEAL_STAGGER}ms both`),
+                        animation: anim(`dealer-pitch 600ms cubic-bezier(0.12, 0.75, 0.2, 1) ${DEAL_START + n * DEAL_STAGGER}ms both, ${after}`),
                       }}
                     >
                       {/* Resting angle lives on an inner wrapper so the flight path isn't rotated with it. */}
@@ -256,13 +377,18 @@ export function DealerScene() {
               )}
 
               {/* Burn cards to the muck */}
-              {TAPS.map((t, i) => {
+              {BURNS.map((t, i) => {
                 const pos = { x: MUCK.x + i * 4, y: MUCK.y - i * 2 };
                 return (
                   <div
                     key={`burn-${i}`}
                     className="absolute"
-                    style={{ ...at(pos.x, pos.y), ...offset(DECK, pos), filter: SHADOW, animation: anim(`dealer-slide 440ms cubic-bezier(0.2, 0.8, 0.3, 1) ${t + 240}ms both`) }}
+                    style={{
+                      ...at(pos.x, pos.y),
+                      ...vars({ d: delta(DECK, pos) }),
+                      filter: SHADOW,
+                      animation: anim(`dealer-slide 440ms ${EASE_OUT} ${t + 240}ms both, dealer-sweep 600ms ${EASE_IN} ${SWEEP_AT + 200}ms forwards`),
+                    }}
                   >
                     <div style={{ rotate: `${-16 + i * 8}deg` }}>
                       <PlayingCard faceDown size="sm" />
@@ -271,41 +397,12 @@ export function DealerScene() {
                 );
               })}
 
-              {/* Flop: slid out as a stack, spread, then turned in a wave */}
+              {/* Board */}
               {[0, 1, 2].map((i) => (
-                <BoardCard
-                  key={`flop-${i}`}
-                  card={BOARD[i]}
-                  x={boardX(i)}
-                  y={BOARD_Y}
-                  flipDelay={FLOP_FLIP + i * 140}
-                  reduced={reduced}
-                  style={
-                    {
-                      ...offset(DECK, { x: boardX(i), y: BOARD_Y }),
-                      "--px": `${boardX(0) - boardX(i)}px`,
-                      animation: anim(`flop-deal 850ms cubic-bezier(0.25, 0.8, 0.3, 1) ${FLOP_AT}ms both`),
-                    } as React.CSSProperties
-                  }
-                />
+                <BoardCard key={`flop-${i}`} card={BOARD[i]} index={i} dealAt={FLOP_AT} flipAt={FLOP_FLIP + i * 140} reduced={reduced} />
               ))}
-              <BoardCard
-                card={BOARD[3]}
-                x={boardX(3)}
-                y={BOARD_Y}
-                flipDelay={TURN_FLIP}
-                reduced={reduced}
-                style={{ ...offset(DECK, { x: boardX(3), y: BOARD_Y }), animation: anim(`dealer-slide 480ms cubic-bezier(0.2, 0.8, 0.3, 1) ${TURN_AT}ms both`) }}
-              />
-              <BoardCard
-                card={BOARD[4]}
-                x={boardX(4)}
-                y={BOARD_Y}
-                slow
-                flipDelay={RIVER_FLIP}
-                reduced={reduced}
-                style={{ ...offset(DECK, { x: boardX(4), y: BOARD_Y }), animation: anim(`dealer-slide 480ms cubic-bezier(0.2, 0.8, 0.3, 1) ${RIVER_AT}ms both`) }}
-              />
+              <BoardCard card={BOARD[3]} index={3} dealAt={TURN_AT} flipAt={TURN_FLIP} reduced={reduced} />
+              <BoardCard card={BOARD[4]} index={4} dealAt={RIVER_AT} flipAt={RIVER_FLIP} slow reduced={reduced} />
             </div>
           </div>
         </div>
