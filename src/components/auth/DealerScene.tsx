@@ -111,9 +111,12 @@ export function DealerScene() {
     const el = wrapper.current;
     if (!el) return;
     // Fit the projected table to both the width and the height on offer.
-    const ro = new ResizeObserver(([e]) =>
-      setScale(Math.min(1.25, e.contentRect.width / (W + 40), e.contentRect.height / (H * 0.82))),
-    );
+    const ro = new ResizeObserver(([e]) => {
+      const byWidth = e.contentRect.width / (W + 40);
+      // A collapsed height means the container isn't sized yet; fit to width alone.
+      const byHeight = e.contentRect.height > 120 ? e.contentRect.height / (H * 0.82) : Infinity;
+      setScale(Math.min(1.25, byWidth, byHeight));
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);

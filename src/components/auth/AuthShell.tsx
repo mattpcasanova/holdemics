@@ -6,7 +6,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
   return (
     <div className="grid min-h-dvh grid-cols-[1.05fr_1fr] max-lg:grid-cols-1">
       <aside
-        className="relative flex flex-col overflow-hidden p-10 max-lg:hidden"
+        className="sticky top-0 flex h-dvh flex-col overflow-hidden p-10 max-lg:hidden"
         style={{
           // A dark room; the scene adds its own spotlight over the table.
           background: "radial-gradient(ellipse 80% 60% at 50% 45%, #1A1D22 0%, #101215 55%, #08090B 100%)",
