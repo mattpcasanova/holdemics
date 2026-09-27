@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { PlayingCard } from "@/components/table/PlayingCard";
+import { LiveTableShowcase } from "./LiveTableShowcase";
 
 /** Split layout for sign-in/sign-up: a felt panel with a fanned hand, and the form. */
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <div className="grid min-h-dvh grid-cols-[1.05fr_1fr] max-lg:grid-cols-1">
       <aside
-        className="relative flex flex-col justify-between overflow-hidden p-10 max-lg:hidden"
+        className="relative flex flex-col overflow-hidden p-10 max-lg:hidden"
         style={{
           background:
             "radial-gradient(ellipse at 40% 45%, #247C53 0%, var(--felt) 40%, var(--felt-deep) 75%, var(--felt-deepest) 100%)",
@@ -16,22 +16,12 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-surface-deep text-[16px] text-gold">♠</span>
           <span className="font-display text-[20px] font-semibold tracking-tight text-white">holdemics</span>
         </Link>
-        <div className="flex justify-center" aria-hidden>
-          <div className="relative h-[190px] w-[260px]">
-            {[
-              { card: { rank: 14 as const, suit: "s" as const }, rot: -14, x: 20 },
-              { card: { rank: 14 as const, suit: "h" as const }, rot: -3, x: 78 },
-              { card: undefined, rot: 9, x: 136 },
-            ].map((c, i) => (
-              <div key={i} className="absolute top-2" style={{ left: c.x, rotate: `${c.rot}deg`, scale: "1.6", transformOrigin: "bottom center" }}>
-                <PlayingCard card={c.card} faceDown={!c.card} size="lg" />
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-1 items-center justify-center py-8">
+          <LiveTableShowcase />
         </div>
-        <p className="max-w-[40ch] text-[14px] leading-relaxed text-green-light-text">
-          Everyone starts with 100 HP. Finish in the top half to climb. Your account keeps a rating for each mode, your
-          reads on other players, and your table settings.
+        <p className="max-w-[46ch] text-[14px] leading-relaxed text-green-light-text">
+          A bot table playing down to the last HP. Everyone starts with 100. Finish in the top half and your rating
+          climbs.
         </p>
       </aside>
 
