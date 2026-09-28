@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { GameState } from "@/lib/engine/game";
 import { MODES } from "@/lib/engine/modes";
 import { evenLobbyPayouts, ordinal } from "@/lib/rating";
+import { ACHIEVEMENT_BY_ID } from "@/lib/achievements";
+import { AchievementBadge } from "@/components/ui/AchievementBadge";
 
 interface ResultOverlayProps {
   game: GameState;
@@ -14,9 +16,11 @@ interface ResultOverlayProps {
   online?: boolean;
   /** Ranked: the real change once the server has written it; undefined while pending. */
   ranked?: { change?: { before: number; after: number } };
+  /** Achievement ids newly earned in this game. */
+  achievements?: string[];
 }
 
-export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPlayAgain, online = false, ranked }: ResultOverlayProps) {
+export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPlayAgain, online = false, ranked, achievements = [] }: ResultOverlayProps) {
   const hero = game.players[heroIndex];
   const place = hero.place ?? 1;
   const n = game.players.length;
@@ -83,6 +87,27 @@ export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPl
             </>
           )}
         </div>
+
+        {achievements.length > 0 && (
+          <div className="mt-3 rounded-lg border border-gold/40 bg-gold/[0.06] px-3 py-2.5 text-left" style={{ animation: "pop-in 300ms ease-out 200ms both" }}>
+            <div className="mb-1.5 text-[11px] font-semibold text-gold">Achievement{achievements.length > 1 ? "s" : ""} unlocked</div>
+            <ul className="flex flex-col gap-1.5">
+              {achievements.map((id) => {
+                const a = ACHIEVEMENT_BY_ID.get(id);
+                if (!a) return null;
+                return (
+                  <li key={id} className="flex items-center gap-2">
+                    <AchievementBadge achievement={a} earned size={30} />
+                    <div>
+                      <div className="text-[13px] font-medium">{a.name}</div>
+                      <div className="text-[11.5px] text-text-secondary">{a.description}</div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-5 flex flex-col gap-2">
           {finished && online ? null : finished ? (

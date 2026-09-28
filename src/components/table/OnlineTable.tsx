@@ -222,6 +222,7 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
               finished={view.phase === "finished"}
               online
               ranked={ranked ? { change: myUserId ? view.ratingChanges?.[myUserId] : undefined } : undefined}
+              achievements={myUserId ? view.achievements?.[myUserId] : undefined}
               onWatch={() => setDismissedResult(true)}
               onSkip={() => setDismissedResult(true)}
               onPlayAgain={() => setDismissedResult(true)}

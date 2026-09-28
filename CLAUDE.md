@@ -104,6 +104,13 @@ node scripts/table-client.mjs CODE   # Scripted second player for two-human tabl
 - **Leaderboard**: `/leaderboard?mode=` lists the top 50 with ≥ placement games, tier via `tierFor` with rank = list position.
 - **Test**: `node scripts/friend-presence.mjs` signs in as the friend account, accepts pending requests, joins presence, and logs invites.
 
+## Achievements
+
+- Definitions and rules in `src/lib/achievements.ts` (tested in `achievements.test.ts`); who earned what in `player_achievements` (public read, server-only writes via the `award_achievements` RPC, guarded by the Vault secret and idempotent).
+- The table room gathers `SeatFacts` per seat (lowest held stack at hand starts counting posted blinds, chip-leader status from four players onward, knockouts credited to the hand's biggest winner, worst showdown loss, all-ins survived) and evaluates rules at game end. Milestone rules use the totals `record_ranked_result` returns.
+- **Eligibility**: ranked games, and private tables with no bots. Practice and bot-filled tables never award anything, so nothing can be farmed.
+- Newly earned ids ride along in `TableView.achievements` and show in the result dialog; `/achievements` lists the catalogue.
+
 ## Rating
 
 Pairwise Elo (`src/lib/rating.ts`): each finish = win vs everyone below, loss vs everyone above. Pairwise K = 70/(n-1) for 8-max, 32 for heads-up; doubled for the first 20 games (provisional). Even 8-player lobby → +35/+25/+15/+5/−5/−15/−25/−35, varying with lobby strength. Separate rating per mode.
@@ -126,7 +133,7 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 2. ~~Supabase auth, profiles, per-mode ratings~~ (done); friends list after private tables
 3. ~~Server-authoritative multiplayer — private friend tables, unrated~~ (done; see Table Server)
 4. ~~Ranked matchmaking~~ (done; 8-max queues exist but need 8 concurrent players)
-5. Cosmetics (avatars, card backs, chip sets) and achievements
+5. ~~Achievements~~ (done); cosmetics (avatars, card backs, chip sets) and unlock rules
 
 ## Known Issues / Gotchas
 

@@ -24,6 +24,8 @@ import type {
 } from "@/lib/realtime/protocol";
 import { redactGame } from "@/lib/realtime/view";
 import { ratingChanges } from "@/lib/rating";
+import { type GameFacts, type PlayerTotals, gameAchievements, milestoneAchievements } from "@/lib/achievements";
+import { STARTING_STACK } from "@/lib/engine/modes";
 import type { Env } from "./index";
 
 /**
@@ -68,7 +70,21 @@ interface TableState {
   due: Due | null;
   ratingChanges?: Record<string, { before: number; after: number }>;
   cancelled?: string;
+  /** Per-seat facts gathered over the game for achievements. */
+  facts?: Record<number, SeatFacts>;
+  achievements?: Record<string, string[]>;
 }
+
+/** What we track per seat during a game; turned into GameFacts at the end. */
+interface SeatFacts {
+  minStack: number;
+  ledFromFinalFour: boolean;
+  knockouts: number;
+  worstShowdownLoss: number | null;
+  survivedAllIn: boolean;
+}
+
+const freshFacts = (): SeatFacts => ({ minStack: STARTING_STACK, ledFromFinalFour: true, knockouts: 0, worstShowdownLoss: null, survivedAllIn: false });
 
 const RANKED_START_TIMEOUT_MS = 30_000;
 
@@ -254,6 +270,7 @@ export class TableRoom extends DurableObject<Env> {
         break;
       case "runout":
         s.runout = null;
+        this.noteHandEnd(g);
         this.pushHistory(g);
         this.scheduleAfterHand(g);
         await this.save();
@@ -324,6 +341,7 @@ export class TableRoom extends DurableObject<Env> {
 
     const seed = Math.floor(Math.random() * 2 ** 31);
     s.game = createGame({ mode: s.config.mode, seats, seed });
+    s.facts = Object.fromEntries(s.seats.map((_, i) => [i, freshFacts()]));
     s.phase = "playing";
     s.step++;
     s.due = { kind: "deal", at: Date.now() + PACE.firstDeal };
@@ -341,6 +359,9 @@ export class TableRoom extends DurableObject<Env> {
 
     const sameHand = prev?.handNumber === next.handNumber;
     const isRunout = !!next.result?.showdown && !!prev && sameHand && next.board.length > prev.board.length;
+
+    if (!sameHand) this.noteHandStart(next);
+    if (next.result && !isRunout) this.noteHandEnd(next);
 
     if (isRunout) {
       s.runout = { hand: next.handNumber, from: prev.board.length, startedAt: Date.now() };
@@ -378,6 +399,7 @@ export class TableRoom extends DurableObject<Env> {
       s.phase = "finished";
       s.due = null;
       if (s.config.ranked) this.pendingRanked = this.recordRanked(g);
+      else if (!s.seats.some((x) => x.isBot)) this.pendingRanked = this.awardGameAchievements(g, {});
       return;
     }
     s.due = { kind: "handEnd", at: Date.now() + (g.result?.showdown ? PACE.showdownEnd : PACE.handEnd) };
@@ -439,9 +461,100 @@ export class TableRoom extends DurableObject<Env> {
       });
       if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
       s.ratingChanges = changes;
+      const totals = (await res.json()) as Record<string, { games: number; wins: number; headsup_wins: number; rating: number; rank: number | null }>;
+      const byUser: Record<string, PlayerTotals> = {};
+      for (const [uid, t] of Object.entries(totals)) {
+        byUser[uid] = { rankedGames: t.games, rankedWins: t.wins, headsUpWins: t.headsup_wins, rating: t.rating, rank: t.rank };
+      }
+      await this.awardGameAchievements(g, byUser);
     } catch (err) {
       console.error("ranked write failed", err);
       s.cancelled = "Ratings couldn't be saved for this game. It won't count.";
+    }
+    await this.save();
+    this.broadcast();
+  }
+
+  // ─── Achievements ────────────────────────────────────────
+
+  /** At each hand start: lowest stack so far, and chip-leader status once four remain. */
+  private noteHandStart(g: GameState) {
+    const facts = this.state!.facts;
+    if (!facts) return;
+    // Blinds are already posted when a hand starts, so count committed chips as still theirs.
+    const held = (p: GameState["players"][number]) => p.stack + p.totalBet;
+    const alive = g.players.filter((p) => !p.eliminated);
+    const top = Math.max(...alive.map(held));
+    const leaders = alive.filter((p) => held(p) === top).length;
+    g.players.forEach((p, i) => {
+      const f = facts[i];
+      if (!f || p.eliminated) return;
+      f.minStack = Math.min(f.minStack, held(p));
+      if (alive.length <= 4 && !(held(p) === top && leaders === 1)) f.ledFromFinalFour = false;
+    });
+  }
+
+  /** At each hand end: knockouts, showdown losses with big hands, all-ins survived. */
+  private noteHandEnd(g: GameState) {
+    const facts = this.state!.facts;
+    const r = g.result;
+    if (!facts || !r) return;
+    const payouts = Object.entries(r.payouts).map(([i, amt]) => ({ i: Number(i), amt }));
+    const biggestWinner = payouts.sort((a, b) => b.amt - a.amt)[0]?.i;
+    if (biggestWinner !== undefined && facts[biggestWinner]) facts[biggestWinner].knockouts += r.busted.length;
+    if (r.showdown) {
+      for (const [i, hand] of Object.entries(r.hands)) {
+        const seat = Number(i);
+        const f = facts[seat];
+        if (!f) continue;
+        const won = (r.payouts[seat] ?? 0) > 0;
+        if (!won) f.worstShowdownLoss = Math.max(f.worstShowdownLoss ?? -1, hand.value.category);
+        else if (g.players[seat].allIn) f.survivedAllIn = true;
+      }
+    }
+  }
+
+  /** Evaluate the rules for every human seat and record what's new. */
+  private async awardGameAchievements(g: GameState, totals: Record<string, PlayerTotals>) {
+    const s = this.state!;
+    if (!s.facts) return;
+    const awards: { user_id: string; achievement_id: string }[] = [];
+    s.seats.forEach((seat, i) => {
+      if (!seat.userId || !s.facts![i]) return;
+      const f = s.facts![i];
+      const gf: GameFacts = {
+        mode: s.config.mode,
+        ranked: !!s.config.ranked,
+        players: s.seats.length,
+        place: g.players[i].place ?? s.seats.length,
+        handsPlayed: g.handNumber,
+        minStack: f.minStack,
+        ledFromFinalFour: f.ledFromFinalFour,
+        knockouts: f.knockouts,
+        worstShowdownLoss: f.worstShowdownLoss,
+        survivedAllIn: f.survivedAllIn,
+      };
+      const ids = new Set(gameAchievements(gf));
+      const t = totals[seat.userId];
+      if (t) for (const id of milestoneAchievements(t, s.config.mode)) ids.add(id);
+      for (const id of ids) awards.push({ user_id: seat.userId, achievement_id: id });
+    });
+    if (!awards.length) return;
+    try {
+      const res = await fetch(`${this.env.SUPABASE_URL}/rest/v1/rpc/award_achievements`, {
+        method: "POST",
+        headers: {
+          apikey: this.env.SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${this.env.SUPABASE_PUBLISHABLE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_secret: this.env.TABLE_SERVER_SECRET, p_code: s.config.code, p_awards: awards }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      const fresh = (await res.json()) as Record<string, string[]>;
+      if (Object.keys(fresh).length) s.achievements = fresh;
+    } catch (err) {
+      console.error("achievement write failed", err);
     }
     await this.save();
     this.broadcast();
@@ -488,6 +601,7 @@ export class TableRoom extends DurableObject<Env> {
       step: s.step,
       ratingChanges: s.ratingChanges,
       cancelled: s.cancelled,
+      achievements: s.achievements,
     };
   }
 

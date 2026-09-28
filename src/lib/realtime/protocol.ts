@@ -74,6 +74,8 @@ export interface TableView {
   ratingChanges?: Record<string, { before: number; after: number }>;
   /** Set when a ranked match was called off before it started. */
   cancelled?: string;
+  /** Achievements newly earned in this game, keyed by user id. */
+  achievements?: Record<string, string[]>;
 }
 
 export type ClientMessage =
