@@ -73,7 +73,8 @@ npm run simulate -- standard 100     # Bot sims: hands/game and avg place per di
 - **Tables**: `profiles` (public read, own update of username/avatar), `ratings` (per mode, public read, server-only writes), `user_settings` (jsonb), `player_notes` (private), `practice_games` (own history). All RLS-enabled with `(select auth.uid())` ownership checks.
 - **Signup**: `private.handle_new_user()` trigger creates profile + 3 rating rows + settings. The requested username comes from signup metadata (user-editable), so it is sanitized and de-duplicated in the trigger and only used as a display name.
 - **Sync**: `AccountSync` (mounted in the root layout) loads settings/notes on sign-in (account wins, guest-only data is uploaded) and saves changes back with a debounce. Local stores stay the source of truth for the UI.
-- **Email confirm**: `/auth/confirm` accepts both `?code=` (default PKCE link) and `?token_hash=&type=`. Add the dev URL to Auth → URL Configuration redirect allow list.
+- **Email confirm**: `/auth/confirm` accepts both `?code=` (default PKCE link) and `?token_hash=&type=`. The dev project has Site URL `http://localhost:3100` and `http://localhost:3100/**` on the redirect allow list.
+- **Dev project**: `flfuvcxbvfviwatnwsnw` ("holdemics", Free org). Test account credentials are in `.env.local` (`TEST_ACCOUNT_*`). The MCP SQL tool is read-only; writes to `auth.*` go through the dashboard SQL editor.
 
 ## Rating
 
@@ -107,6 +108,7 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 - **All-in runouts**: the engine deals every remaining street in one action. `usePracticeGame` detects this, exposes `runout`, and serves a masked view (`maskResult` in lib/practice/runout.ts) until the schedule finishes, so stacks, standings, and the log don't spoil the result. Each street is dealt face down only when reached, then turned; the river holds longer and flips slowly. Timing lives in `runoutSchedule()`; normal-street and deal timings live in `src/lib/practice/timing.ts` and are shared by animations and sound cues — change them there, not inline.
 - **Audio** is synthesized with Web Audio (`src/lib/audio.ts`), no asset files. The AudioContext unlocks on the first pointer/key event.
 - Don't use requestAnimationFrame for state that must advance while the tab is hidden (rAF pauses in background tabs); use a timer.
+- Practice results are saved through the route handler `POST /api/practice-games`, not a server action. A server action called from the practice table got a 503 from the dev server before reaching any app code (the same action replayed by hand returned 200); the route handler is plain HTTP and testable with curl.
 - Anything rendered inside the sticky NavRail (or other stacking contexts) must portal modals to `document.body` — see SettingsDialog.
 - Tailwind v4 `translate-*` utilities use the CSS `translate` property, which stacks with an inline `transform: translate(...)`. Don't mix them on one element.
 - Player notes for bots are keyed by bot name (bots are regenerated each game); real players will key by user id.
