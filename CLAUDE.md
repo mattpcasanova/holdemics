@@ -52,6 +52,8 @@ npm run build                        # Production build
 npm run lint                         # ESLint
 npm test                             # Engine + rating tests
 npm run simulate -- standard 100     # Bot sims: hands/game and avg place per difficulty
+cd server && npm run dev             # Table server (Cloudflare Worker, local, port 8787)
+node scripts/table-client.mjs CODE   # Scripted second player for two-human table tests (uses TEST_FRIEND_* in .env.local)
 ```
 
 ## Game Rules (source of truth: src/lib/engine)
