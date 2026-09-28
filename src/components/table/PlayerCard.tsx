@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Avatar } from "@/components/ui/Avatar";
+import { PlayerTitle } from "@/components/ui/PlayerTitle";
 import { TagIcon } from "@/components/ui/TagIcon";
 import type { PlayerState } from "@/lib/engine/game";
 import { formatHp } from "@/lib/engine/modes";
@@ -14,6 +15,8 @@ interface PlayerCardProps {
   stats: PlayerStats | undefined;
   /** e.g. "Regular bot"; null for real players. */
   botLabel: string | null;
+  /** Selected profile title id. */
+  title?: string | null;
   onClose: () => void;
 }
 
@@ -26,7 +29,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint: stri
   );
 }
 
-export function PlayerCard({ player, isHero, stats = EMPTY_STATS, botLabel, onClose }: PlayerCardProps) {
+export function PlayerCard({ player, isHero, stats = EMPTY_STATS, botLabel, title, onClose }: PlayerCardProps) {
   const notes = useNotes();
   const key = noteKey(player);
   const note = notes[key];
@@ -54,6 +57,7 @@ export function PlayerCard({ player, isHero, stats = EMPTY_STATS, botLabel, onCl
             <span className="truncate font-display text-[16px] font-semibold">{isHero ? "You" : player.name}</span>
             {note?.tag && <TagIcon tag={note.tag} size={15} />}
           </div>
+          {title && <PlayerTitle id={title} size={9.5} className="mb-0.5" />}
           <div className="text-[12px] text-text-tertiary">
             {botLabel ?? "Player"} · {player.eliminated ? "eliminated" : `${formatHp(player.stack)} HP`}
           </div>

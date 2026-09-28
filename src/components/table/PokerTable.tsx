@@ -404,6 +404,7 @@ export function PokerTable({
             isHero={selected.index === heroIndex}
             stats={stats[game.players[selected.index].id]}
             botLabel={game.players[selected.index].isBot ? (botLabels?.[selected.index] ?? botLabel) : null}
+            title={titles?.[selected.index]}
             onClose={() => setSelected(null)}
           />
         </Popover>
