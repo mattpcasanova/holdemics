@@ -96,6 +96,13 @@ node scripts/table-client.mjs CODE   # Scripted second player for two-human tabl
 - **Tiers** (`src/lib/tiers.ts`): Unranked during placement, then Fish → Calling Station → Nit → Reg → Grinder → Pro → Crusher → Shark by rating, and The Nuts for the top 50 in a mode (`mode_rank` RPC).
 - **Test**: `node scripts/table-client.mjs --as friend --queue headsup` and `--as matt --queue headsup --strategy shove` in two shells; `--noshow` tests cancellation.
 
+## Friends, Presence, Leaderboard
+
+- **Friends**: `friend_requests` rows (from, to, status pending/accepted); an accepted row in either direction is the friendship, one row per pair (unique on least/greatest). `POST /api/friends` handles request/accept/remove; `find_profile(username)` RPC does the case-insensitive lookup.
+- **Presence and invites** (`src/lib/presence.ts`): one public Realtime channel `holdemics:presence`. `PresenceTracker` (root layout) tracks `{userId, username, where}` for the signed-in player; `useOnline()` reads the synced state; invites are `broadcast` events on the same channel, filtered client-side by `to`. Nothing is stored. Caveat: public channel, so a signed-in user could forge an invite payload; move to a private channel with RLS on `realtime.messages` before it matters.
+- **Leaderboard**: `/leaderboard?mode=` lists the top 50 with ≥ placement games, tier via `tierFor` with rank = list position.
+- **Test**: `node scripts/friend-presence.mjs` signs in as the friend account, accepts pending requests, joins presence, and logs invites.
+
 ## Rating
 
 Pairwise Elo (`src/lib/rating.ts`): each finish = win vs everyone below, loss vs everyone above. Pairwise K = 70/(n-1) for 8-max, 32 for heads-up; doubled for the first 20 games (provisional). Even 8-player lobby → +35/+25/+15/+5/−5/−15/−25/−35, varying with lobby strength. Separate rating per mode.

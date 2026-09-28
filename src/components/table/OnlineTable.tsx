@@ -10,6 +10,7 @@ import { BOT_LEVELS } from "@/lib/engine/bots";
 import { potTotal } from "@/lib/engine/game";
 import { MODES, blindsForLevel, describeLevelLength, formatHp } from "@/lib/engine/modes";
 import { type StatsTable, accumulateHand } from "@/lib/stats";
+import { InviteFriends } from "@/components/friends/InviteFriends";
 import type { SeatView, TableView } from "@/lib/realtime/protocol";
 import { ActionBar } from "./ActionBar";
 import { HandLog } from "./HandLog";
@@ -346,6 +347,7 @@ function LobbyTable({
           </div>
         ))}
       </div>
+      {open > 0 && <InviteFriends code={view.config.code} mode={config.name} seatedIds={view.seats.map((s) => s.userId).filter((id): id is string => !!id)} />}
       <div className="flex gap-2">
         {you === null ? (
           <button onClick={onSit} className="rounded-lg bg-gold px-5 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110">

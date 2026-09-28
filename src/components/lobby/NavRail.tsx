@@ -6,8 +6,8 @@ import type { Profile } from "@/lib/account";
 const ITEMS = [
   { label: "Play", href: "/", icon: "♠", live: true },
   { label: "Practice", href: "/#practice", icon: "♦", live: true },
-  { label: "Friends", href: null, icon: "♥", live: false },
-  { label: "Leaderboard", href: null, icon: "♣", live: false },
+  { label: "Friends", href: "/friends", icon: "♥", live: true },
+  { label: "Leaderboard", href: "/leaderboard", icon: "♣", live: true },
 ];
 
 export function NavRail({ active = "Play", profile }: { active?: string; profile: Profile | null }) {

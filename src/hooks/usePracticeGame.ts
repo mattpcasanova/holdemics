@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { play } from "@/lib/audio";
 import { type BotLevel, decideBotAction } from "@/lib/engine/bots";
 import {
   type Action,

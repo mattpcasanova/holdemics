@@ -22,7 +22,9 @@ export function ProfileCard({ account }: { account: Account | null }) {
           <h2 id="profile-heading" className="truncate text-[14px] font-medium">
             {name}
           </h2>
-          <div className="text-[12px] text-text-tertiary">{account ? "Ranked play opens soon" : "Unrated"}</div>
+          <div className="text-[12px] text-text-tertiary">
+            {account ? `${account.ratings.reduce((n, r) => n + r.games, 0)} ranked games` : "Unrated"}
+          </div>
         </div>
       </div>
       <div className="mt-4 grid grid-cols-3 gap-2 text-center">
