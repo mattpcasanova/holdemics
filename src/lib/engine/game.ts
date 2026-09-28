@@ -32,6 +32,8 @@ export interface PlayerState extends SeatInfo {
   /** Final placement (1 = winner), set once eliminated or the game ends. */
   place: number | null;
   holeCards: Card[];
+  /** Dealt into the current hand. Kept separate from holeCards so views can hide cards. */
+  dealt: boolean;
   folded: boolean;
   allIn: boolean;
   /** Committed on the current street. */
@@ -124,6 +126,7 @@ export function createGame(opts: { mode: ModeId; seats: SeatInfo[]; seed: number
     eliminated: false,
     place: null,
     holeCards: [],
+    dealt: false,
     folded: false,
     allIn: false,
     bet: 0,
@@ -161,7 +164,7 @@ export function createGame(opts: { mode: ModeId; seats: SeatInfo[]; seed: number
 // ─── Queries ─────────────────────────────────────────────
 
 export function isInHand(p: PlayerState): boolean {
-  return !p.eliminated && !p.folded && p.holeCards.length > 0;
+  return !p.eliminated && !p.folded && p.dealt;
 }
 
 function canAct(p: PlayerState): boolean {
@@ -265,6 +268,7 @@ export function startHand(prev: GameState): GameState {
 
   for (const p of state.players) {
     p.holeCards = [];
+    p.dealt = false;
     p.folded = false;
     p.allIn = false;
     p.bet = 0;
@@ -292,6 +296,7 @@ export function startHand(prev: GameState): GameState {
     let i = state.sbIndex;
     for (let k = 0; k < alivePlayers(state).length; k++) {
       state.players[i].holeCards.push(state.deck.pop()!);
+      state.players[i].dealt = true;
       i = nextIndex(state, i, alive)!;
     }
   }

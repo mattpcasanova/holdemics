@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type SoundName, play } from "@/lib/audio";
+import { play } from "@/lib/audio";
 import { type BotLevel, decideBotAction } from "@/lib/engine/bots";
 import {
   type Action,
@@ -16,13 +16,8 @@ import {
 import { type ModeId, MODES } from "@/lib/engine/modes";
 import { botSeats } from "@/lib/practice/bots";
 import { maskResult, runoutSchedule } from "@/lib/practice/runout";
-import {
-  BOARD_DEAL_STAGGER_MS,
-  DEAL_LAND_MS,
-  DEAL_STAGGER_MS,
-  FLIP_SOUND_OFFSET_MS,
-  boardFlipDelay,
-} from "@/lib/practice/timing";
+import { playEventSounds, playRunoutSounds, playYourTurn } from "@/lib/practice/sounds";
+import { DEAL_STAGGER_MS } from "@/lib/practice/timing";
 import { useSettings } from "@/lib/settings";
 import { type StatsTable, accumulateHand } from "@/lib/stats";
 
@@ -72,38 +67,6 @@ function runToEnd(state: GameState, level: BotLevel): GameState {
     s = s.phase === "betting" ? applyAction(s, decideBotAction(s, level)) : startHand(s);
   }
   return s;
-}
-
-/**
- * Sounds for newly appended log events. Runout streets are cued by the reveal,
- * and the win sound plays with the pot-push animation on the table.
- */
-function soundsFor(events: LogEvent[], state: GameState, runout: boolean) {
-  for (const e of events) {
-    let name: SoundName | null = null;
-    switch (e.kind) {
-      case "hand": {
-        const dealt = alivePlayers(state).length * 2;
-        for (let i = 0; i < dealt; i++) play("deal", i * DEAL_STAGGER_MS + DEAL_LAND_MS);
-        break;
-      }
-      case "level":
-        name = "levelUp";
-        break;
-      case "action":
-        name = e.allIn ? "allIn" : e.action === "raise" ? "bet" : e.action;
-        break;
-      case "street":
-        if (!runout) {
-          e.cards.forEach((_, i) => {
-            play("deal", i * BOARD_DEAL_STAGGER_MS);
-            play("flip", boardFlipDelay(i) + FLIP_SOUND_OFFSET_MS);
-          });
-        }
-        break;
-    }
-    if (name) play(name);
-  }
 }
 
 export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you") {
@@ -160,10 +123,8 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
     );
     if (isRunout && !quiet) setRunout({ hand: next.handNumber, from: prev.board.length, startedAt: Date.now() });
     if (!quiet) {
-      soundsFor(fresh, next, isRunout);
-      if (next.toAct === HERO && (prev.toAct !== HERO || !sameHand) && !sittingOutRef.current) {
-        play("yourTurn", sameHand ? 0 : alivePlayers(next).length * 2 * DEAL_STAGGER_MS);
-      }
+      playEventSounds(fresh, next, isRunout);
+      if (next.toAct === HERO && (prev.toAct !== HERO || !sameHand) && !sittingOutRef.current) playYourTurn(next, !sameHand);
     }
 
     // Runout hands enter the history once the reveal finishes (see below).
@@ -177,7 +138,7 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
       processedHand.current = next.handNumber;
       const dealt: Record<number, string> = {};
       next.players.forEach((p, i) => {
-        if (p.holeCards.length) dealt[i] = p.id;
+        if (p.dealt) dealt[i] = p.id;
       });
       setStats((s) => accumulateHand(s, next.log, dealt));
     }
@@ -186,12 +147,9 @@ export function usePracticeGame(mode: ModeId, level: BotLevel, heroName = "you")
   // Drive the runout: flip sounds on schedule, then reveal the result.
   useEffect(() => {
     if (!runout || runout.hand !== game.handNumber) return;
-    const { cards, doneAt } = runoutSchedule(runout.from);
+    const { doneAt } = runoutSchedule(runout.from);
     const elapsed = Date.now() - runout.startedAt;
-    for (const [, c] of Object.entries(cards)) {
-      play("deal", Math.max(0, c.dealAt - elapsed + 120));
-      play("flip", Math.max(0, c.flipAt - elapsed + (c.dramatic ? 300 : FLIP_SOUND_OFFSET_MS)));
-    }
+    playRunoutSounds(runout.from, runout.startedAt);
     const t = setTimeout(() => {
       setRevealedHand(runout.hand);
       setHistory((h) => {

@@ -3,7 +3,8 @@ import { MobileTopBar } from "@/components/lobby/MobileTopBar";
 import { NavRail } from "@/components/lobby/NavRail";
 import { PracticePicker } from "@/components/lobby/PracticePicker";
 import { RecentGames } from "@/components/lobby/RecentGames";
-import { FriendsCard, ProfileCard, RulesCard } from "@/components/lobby/SidePanels";
+import { PlayWithFriends } from "@/components/lobby/PlayWithFriends";
+import { ProfileCard, RulesCard } from "@/components/lobby/SidePanels";
 import { getAccount } from "@/lib/account";
 
 export default async function LobbyPage() {
@@ -20,7 +21,7 @@ export default async function LobbyPage() {
         </div>
         <aside className="flex flex-col gap-4">
           <ProfileCard account={account} />
-          <FriendsCard />
+          <PlayWithFriends signedIn={!!account} />
           <RulesCard />
         </aside>
       </div>

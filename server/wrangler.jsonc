@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "holdemics-tables",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "durable_objects": {
+    "bindings": [{ "name": "TABLES", "class_name": "TableRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TableRoom"] }],
+  "vars": {
+    "SUPABASE_URL": "https://flfuvcxbvfviwatnwsnw.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_M8prsR7oy_yKiDW4QxR9-A_u8jsE_Sh",
+    "ALLOWED_ORIGIN": "http://localhost:3100"
+  },
+  "dev": { "port": 8787 }
+}

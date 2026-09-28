@@ -78,7 +78,7 @@ export function Seat({
   const inactive = out || player.folded;
   // Folded opponents muck their cards; the hero keeps seeing theirs, dimmed.
   // Players knocked out this hand keep their revealed cards up so you can see what beat them.
-  const dealt = player.holeCards.length > 0 && (isHero || !player.folded) && (!out || !!revealed);
+  const dealt = player.dealt && (isHero || !player.folded) && (!out || !!revealed);
   const status = statusText(player, isActing, isHero, sittingOut);
 
   const border = won

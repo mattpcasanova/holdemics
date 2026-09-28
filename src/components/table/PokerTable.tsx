@@ -200,7 +200,7 @@ export function PokerTable({
   const dealOrder: number[] = [];
   for (let k = 0; k < n; k++) {
     const i = (game.sbIndex + k + n) % n;
-    if (game.players[i]?.holeCards.length && !game.players[i].eliminated) dealOrder.push(i);
+    if (game.players[i]?.dealt && !game.players[i].eliminated) dealOrder.push(i);
   }
 
   return (

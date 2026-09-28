@@ -10,9 +10,11 @@ interface ResultOverlayProps {
   onWatch: () => void;
   onSkip: () => void;
   onPlayAgain: () => void;
+  /** Live table: no skipping ahead, and "play again" isn't offered. */
+  online?: boolean;
 }
 
-export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPlayAgain }: ResultOverlayProps) {
+export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPlayAgain, online = false }: ResultOverlayProps) {
   const hero = game.players[heroIndex];
   const place = hero.place ?? 1;
   const n = game.players.length;
@@ -42,7 +44,7 @@ export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPl
           {headline}
         </h2>
         <p className="mt-1 text-[13px] text-text-secondary">
-          {MODES[game.mode].name} practice, {n} players, {game.handNumber} {game.handNumber === 1 ? "hand" : "hands"}.
+          {MODES[game.mode].name} {online ? "table" : "practice"}, {n} players, {game.handNumber} {game.handNumber === 1 ? "hand" : "hands"}.
           {finished && !won && winner ? ` ${winner.name} took it down.` : ""}
         </p>
 
@@ -61,7 +63,7 @@ export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPl
         </div>
 
         <div className="mt-5 flex flex-col gap-2">
-          {finished ? (
+          {finished && online ? null : finished ? (
             <button
               onClick={onPlayAgain}
               className="rounded-lg bg-gold py-2.5 font-display text-[14px] font-semibold text-surface-primary transition hover:brightness-110"
@@ -76,12 +78,14 @@ export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPl
               >
                 Watch the rest
               </button>
-              <button
-                onClick={onSkip}
-                className="flex-1 rounded-lg bg-gold py-2.5 font-display text-[14px] font-semibold text-surface-primary transition hover:brightness-110"
-              >
-                Skip to results
-              </button>
+              {!online && (
+                <button
+                  onClick={onSkip}
+                  className="flex-1 rounded-lg bg-gold py-2.5 font-display text-[14px] font-semibold text-surface-primary transition hover:brightness-110"
+                >
+                  Skip to results
+                </button>
+              )}
             </div>
           )}
           <Link href="/" className="py-1.5 text-[13px] text-text-secondary transition hover:text-text-primary">

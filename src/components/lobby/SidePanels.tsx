@@ -60,22 +60,6 @@ export function ProfileCard({ account }: { account: Account | null }) {
   );
 }
 
-export function FriendsCard() {
-  return (
-    <section aria-labelledby="friends-heading" className="rounded-xl border border-border bg-surface-primary p-4">
-      <h2 id="friends-heading" className="font-display text-[15px] font-semibold">
-        Friends
-      </h2>
-      <p className="mt-1 text-[12.5px] leading-snug text-text-secondary">
-        Add friends to invite them to private tables. Private games are unrated, so nobody can farm rating off a friend.
-      </p>
-      <button disabled className="mt-3 w-full cursor-not-allowed rounded-lg border border-border py-2 text-[13px] text-text-tertiary">
-        Add friends after sign-in
-      </button>
-    </section>
-  );
-}
-
 export function RulesCard() {
   const rules = [
     { title: "HP is your stack", body: "Start with 100 HP. Win pots to take HP from others; hit zero and you're out." },

@@ -1,0 +1,430 @@
+import { DurableObject } from "cloudflare:workers";
+import { decideBotAction } from "@/lib/engine/bots";
+import {
+  type GameState,
+  type LogEvent,
+  type SeatInfo,
+  alivePlayers,
+  applyAction,
+  createGame,
+  legalActions,
+  startHand,
+} from "@/lib/engine/game";
+import { MODES } from "@/lib/engine/modes";
+import { botSeats } from "@/lib/practice/bots";
+import { maskResult, runoutSchedule } from "@/lib/practice/runout";
+import { DEAL_STAGGER_MS } from "@/lib/practice/timing";
+import type {
+  ClientMessage,
+  CreateTableRequest,
+  ServerMessage,
+  TableConfig,
+  TablePhase,
+  TableView,
+} from "@/lib/realtime/protocol";
+import { redactGame } from "@/lib/realtime/view";
+import type { Env } from "./index";
+
+/**
+ * One private table. Holds the engine state, seats players and bots, runs the
+ * decision clock and bot turns on alarms, and sends each connection a view
+ * with everyone else's hole cards removed.
+ *
+ * All state lives in `this.state` and is written to storage after every
+ * transition, so the object can hibernate between events.
+ */
+
+interface Seat {
+  userId: string | null;
+  name: string;
+  isBot: boolean;
+  sittingOut: boolean;
+  bankMs: number;
+}
+
+/** What the next alarm should do. */
+type Due =
+  | { kind: "bot"; at: number }
+  | { kind: "clock"; at: number }
+  | { kind: "sitout"; at: number }
+  | { kind: "handEnd"; at: number }
+  | { kind: "runout"; at: number }
+  | { kind: "deal"; at: number };
+
+interface TableState {
+  config: TableConfig;
+  phase: TablePhase;
+  seats: Seat[];
+  game: GameState | null;
+  /** Epoch ms when the current decision started (for the clock). */
+  turnStartedAt: number | null;
+  runout: { hand: number; from: number; startedAt: number } | null;
+  history: { hand: number; events: LogEvent[] }[];
+  /** Increments on every game transition; clients echo it so stale actions are ignored. */
+  step: number;
+  due: Due | null;
+}
+
+interface Attachment {
+  userId: string;
+  username: string;
+}
+
+const PACE = { botMin: 650, botMax: 1500, handEnd: 1600, showdownEnd: 3200, firstDeal: 900 };
+const SITOUT_ACT_MS = 500;
+const HISTORY_LIMIT = 12;
+
+export class TableRoom extends DurableObject<Env> {
+  private state: TableState | null = null;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.blockConcurrencyWhile(async () => {
+      this.state = (await ctx.storage.get<TableState>("table")) ?? null;
+    });
+  }
+
+  // ─── HTTP entry points (from the Worker router) ──────────
+
+  async fetch(request: Request): Promise<Response> {
+    const path = new URL(request.url).pathname;
+
+    if (path === "/create") {
+      const { config } = (await request.json()) as CreateTableRequest;
+      if (this.state) return Response.json({ error: "Table already exists" }, { status: 409 });
+      const seats = MODES[config.mode].seats;
+      this.state = {
+        config,
+        phase: "lobby",
+        seats: Array.from({ length: seats }, () => ({ userId: null, name: "", isBot: false, sittingOut: false, bankMs: 0 })),
+        game: null,
+        turnStartedAt: null,
+        runout: null,
+        history: [],
+        step: 0,
+        due: null,
+      };
+      await this.save();
+      return Response.json({ ok: true });
+    }
+
+    if (path === "/summary") {
+      if (!this.state) return Response.json({ error: "No such table" }, { status: 404 });
+      const s = this.state;
+      return Response.json({
+        code: s.config.code,
+        mode: s.config.mode,
+        phase: s.phase,
+        seated: s.seats.filter((x) => x.userId || x.isBot).length,
+        seats: s.seats.length,
+      });
+    }
+
+    if (path === "/ws") {
+      if (!this.state) return Response.json({ error: "No such table" }, { status: 404 });
+      const attachment: Attachment = {
+        userId: request.headers.get("X-User-Id")!,
+        username: request.headers.get("X-Username")!,
+      };
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+      this.ctx.acceptWebSocket(server);
+      server.serializeAttachment(attachment);
+      // A returning player keeps their seat; just refresh everyone's view.
+      this.broadcast();
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // ─── WebSocket handlers ──────────────────────────────────
+
+  async webSocketMessage(ws: WebSocket, raw: ArrayBuffer | string) {
+    if (!this.state || typeof raw !== "string") return;
+    let msg: ClientMessage;
+    try {
+      msg = JSON.parse(raw) as ClientMessage;
+    } catch {
+      return;
+    }
+    const who = ws.deserializeAttachment() as Attachment;
+    const seat = this.state.seats.findIndex((s) => s.userId === who.userId);
+
+    switch (msg.type) {
+      case "ping":
+        this.send(ws, { type: "pong" });
+        return;
+      case "sit":
+        this.sit(who);
+        break;
+      case "stand":
+        this.stand(who);
+        break;
+      case "start":
+        if (who.userId !== this.state.config.hostId) return this.send(ws, { type: "error", message: "Only the host can start the game." });
+        this.startGame();
+        break;
+      case "back":
+        if (seat >= 0) this.state.seats[seat].sittingOut = false;
+        break;
+      case "act": {
+        const g = this.state.game;
+        if (!g || g.phase !== "betting" || seat < 0 || g.toAct !== seat) return;
+        if (msg.hand !== g.handNumber || msg.step !== this.state.step) return; // stale
+        const legal = legalActions(g);
+        if (!legal) return;
+        try {
+          this.chargeTimeBank(seat);
+          this.transition(applyAction(g, msg.action));
+          return;
+        } catch (e) {
+          return this.send(ws, { type: "error", message: e instanceof Error ? e.message : "Illegal action" });
+        }
+      }
+    }
+    await this.save();
+    this.broadcast();
+  }
+
+  async webSocketClose(ws: WebSocket) {
+    ws.close();
+    // In the lobby a player who leaves frees their seat; mid-game the seat is kept.
+    if (this.state?.phase === "lobby") {
+      const who = ws.deserializeAttachment() as Attachment | null;
+      if (who && !this.isConnected(who.userId, ws)) this.stand(who);
+    }
+    await this.save();
+    this.broadcast();
+  }
+
+  async webSocketError(ws: WebSocket) {
+    ws.close(1011, "error");
+  }
+
+  // ─── Alarms drive everything the players don't ──────────
+
+  async alarm() {
+    const s = this.state;
+    if (!s?.due || !s.game) return;
+    const due = s.due;
+    s.due = null;
+    const g = s.game;
+
+    switch (due.kind) {
+      case "deal":
+      case "handEnd":
+        if (g.phase !== "finished") this.transition(startHand(g));
+        break;
+      case "runout":
+        s.runout = null;
+        this.pushHistory(g);
+        this.scheduleAfterHand(g);
+        await this.save();
+        this.broadcast();
+        break;
+      case "bot":
+        if (g.phase === "betting" && g.toAct !== null && s.seats[g.toAct].isBot) {
+          this.transition(applyAction(g, decideBotAction(g, s.config.botLevel)));
+        }
+        break;
+      case "sitout":
+      case "clock":
+        if (g.phase === "betting" && g.toAct !== null) {
+          const seat = s.seats[g.toAct];
+          const legal = legalActions(g);
+          if (legal) {
+            if (due.kind === "clock") {
+              seat.bankMs = 0;
+              seat.sittingOut = true;
+            }
+            this.transition(applyAction(g, { type: legal.canCheck ? "check" : "fold" }));
+          }
+        }
+        break;
+    }
+  }
+
+  // ─── Lobby ───────────────────────────────────────────────
+
+  private sit(who: Attachment) {
+    const s = this.state!;
+    if (s.phase !== "lobby") return;
+    if (s.seats.some((x) => x.userId === who.userId)) return;
+    const empty = s.seats.findIndex((x) => !x.userId && !x.isBot);
+    if (empty < 0) return;
+    s.seats[empty] = { userId: who.userId, name: who.username, isBot: false, sittingOut: false, bankMs: 0 };
+  }
+
+  private stand(who: Attachment) {
+    const s = this.state!;
+    if (s.phase !== "lobby") return;
+    const i = s.seats.findIndex((x) => x.userId === who.userId);
+    if (i >= 0) s.seats[i] = { userId: null, name: "", isBot: false, sittingOut: false, bankMs: 0 };
+  }
+
+  private startGame() {
+    const s = this.state!;
+    if (s.phase !== "lobby") return;
+    const humans = s.seats.filter((x) => x.userId);
+    if (humans.length === 0) return;
+
+    // Fill the empty seats with bots so the table is full.
+    const bots = botSeats(s.seats.length - humans.length, s.config.botLevel);
+    let b = 0;
+    for (const seat of s.seats) {
+      if (seat.userId) continue;
+      const bot = bots[b++];
+      seat.isBot = true;
+      seat.name = bot.name;
+      seat.userId = null;
+    }
+    const seats: SeatInfo[] = s.seats.map((seat, i) => ({ id: seat.userId ?? `bot-${i}`, name: seat.name, isBot: seat.isBot }));
+    const bank = MODES[s.config.mode].timeBankSeconds * 1000;
+    for (const seat of s.seats) seat.bankMs = seat.isBot ? 0 : bank;
+
+    const seed = Math.floor(Math.random() * 2 ** 31);
+    s.game = createGame({ mode: s.config.mode, seats, seed });
+    s.phase = "playing";
+    s.step++;
+    s.due = { kind: "deal", at: Date.now() + PACE.firstDeal };
+  }
+
+  // ─── Game transitions ────────────────────────────────────
+
+  /** Apply a new engine state, then work out what happens next and when. */
+  private transition(next: GameState) {
+    const s = this.state!;
+    const prev = s.game;
+    s.game = next;
+    s.step++;
+    s.turnStartedAt = next.phase === "betting" ? Date.now() : null;
+
+    const sameHand = prev?.handNumber === next.handNumber;
+    const isRunout = !!next.result?.showdown && !!prev && sameHand && next.board.length > prev.board.length;
+
+    if (isRunout) {
+      s.runout = { hand: next.handNumber, from: prev.board.length, startedAt: Date.now() };
+      s.due = { kind: "runout", at: Date.now() + runoutSchedule(prev.board.length).doneAt };
+    } else if (next.phase === "betting") {
+      this.pushHistory(next);
+      this.scheduleTurn(next);
+    } else {
+      this.pushHistory(next);
+      this.scheduleAfterHand(next);
+    }
+
+    void this.save();
+    this.broadcast();
+  }
+
+  private scheduleTurn(g: GameState) {
+    const s = this.state!;
+    const seat = s.seats[g.toAct!];
+    const mode = MODES[s.config.mode];
+    // Wait out the deal animation before the first action of a hand.
+    const dealing = g.log.length <= 4 ? alivePlayers(g).length * 2 * DEAL_STAGGER_MS : 0;
+    if (seat.isBot) {
+      s.due = { kind: "bot", at: Date.now() + dealing + PACE.botMin + Math.random() * (PACE.botMax - PACE.botMin) };
+    } else if (seat.sittingOut) {
+      s.due = { kind: "sitout", at: Date.now() + dealing + SITOUT_ACT_MS };
+    } else {
+      s.due = { kind: "clock", at: Date.now() + dealing + mode.decisionSeconds * 1000 + seat.bankMs };
+    }
+  }
+
+  private scheduleAfterHand(g: GameState) {
+    const s = this.state!;
+    if (g.phase === "finished") {
+      s.phase = "finished";
+      s.due = null;
+      return;
+    }
+    s.due = { kind: "handEnd", at: Date.now() + (g.result?.showdown ? PACE.showdownEnd : PACE.handEnd) };
+  }
+
+  /** Time used beyond the decision clock comes out of the player's bank. */
+  private chargeTimeBank(seat: number) {
+    const s = this.state!;
+    if (s.turnStartedAt === null) return;
+    const overtime = Date.now() - s.turnStartedAt - MODES[s.config.mode].decisionSeconds * 1000;
+    if (overtime > 0) s.seats[seat].bankMs = Math.max(0, s.seats[seat].bankMs - overtime);
+  }
+
+  private pushHistory(g: GameState) {
+    const s = this.state!;
+    const rest = s.history.length && s.history[s.history.length - 1].hand === g.handNumber ? s.history.slice(0, -1) : s.history;
+    s.history = [...rest, { hand: g.handNumber, events: g.log }].slice(-HISTORY_LIMIT);
+  }
+
+  // ─── Views and I/O ───────────────────────────────────────
+
+  private viewFor(who: Attachment): TableView {
+    const s = this.state!;
+    const you = s.seats.findIndex((x) => x.userId === who.userId);
+    const viewer = you >= 0 ? you : null;
+    const full = s.game;
+    const masked = full && s.runout ? maskResult(full) : full;
+    const game = masked ? redactGame(masked, viewer) : null;
+    const mode = MODES[s.config.mode];
+    const yourTurn = full?.phase === "betting" && viewer !== null && full.toAct === viewer && !s.runout;
+
+    return {
+      config: s.config,
+      phase: s.phase,
+      seats: s.seats.map((seat, index) => ({
+        index,
+        userId: seat.userId,
+        name: seat.name,
+        isBot: seat.isBot,
+        connected: seat.isBot || (seat.userId !== null && this.isConnected(seat.userId)),
+        isHost: seat.userId === s.config.hostId,
+        sittingOut: seat.sittingOut,
+      })),
+      game,
+      you: viewer,
+      legal: yourTurn && !s.seats[viewer].sittingOut ? legalActions(full) : null,
+      turn:
+        full?.phase === "betting" && full.toAct !== null && s.turnStartedAt !== null && !s.runout
+          ? {
+              player: full.toAct,
+              startedAt: s.turnStartedAt,
+              decisionMs: mode.decisionSeconds * 1000,
+              bankMs: viewer === full.toAct ? s.seats[viewer].bankMs : 0,
+            }
+          : null,
+      runout: s.runout,
+      history: s.history,
+      step: s.step,
+    };
+  }
+
+  private broadcast() {
+    if (!this.state) return;
+    for (const ws of this.ctx.getWebSockets()) {
+      const who = ws.deserializeAttachment() as Attachment | null;
+      if (!who) continue;
+      this.send(ws, { type: "view", view: this.viewFor(who) });
+    }
+  }
+
+  private send(ws: WebSocket, msg: ServerMessage) {
+    try {
+      ws.send(JSON.stringify(msg));
+    } catch {
+      // Socket already gone; its close handler cleans up.
+    }
+  }
+
+  private isConnected(userId: string, except?: WebSocket): boolean {
+    return this.ctx.getWebSockets().some((ws) => ws !== except && (ws.deserializeAttachment() as Attachment | null)?.userId === userId);
+  }
+
+  private async save() {
+    if (!this.state) return;
+    await this.ctx.storage.put("table", this.state);
+    const at = this.state.due?.at;
+    if (at !== undefined) await this.ctx.storage.setAlarm(at);
+    else await this.ctx.storage.deleteAlarm();
+  }
+}
