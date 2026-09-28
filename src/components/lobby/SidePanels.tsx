@@ -7,7 +7,9 @@ const RATED_MODES: { id: ModeId; label: string }[] = [
   { id: "turbo", label: "Turbo" },
   { id: "headsup", label: "Heads-Up" },
 ];
-const PROVISIONAL_GAMES = 20;
+
+/** Placement games before a rating settles. Multi-player games carry more information per game. */
+const PLACEMENT_GAMES: Record<ModeId, number> = { standard: 10, turbo: 10, headsup: 20 };
 
 export function ProfileCard({ account }: { account: Account | null }) {
   const name = account?.profile.username ?? "Guest";
@@ -26,22 +28,33 @@ export function ProfileCard({ account }: { account: Account | null }) {
       <div className="mt-4 grid grid-cols-3 gap-2 text-center">
         {RATED_MODES.map((m) => {
           const r = byMode.get(m.id);
-          const provisional = r ? r.games < PROVISIONAL_GAMES : true;
+          const needed = PLACEMENT_GAMES[m.id];
+          const placed = r ? Math.min(r.games, needed) : 0;
           return (
-            <div key={m.id} className="rounded-lg bg-surface-deep py-2" title={provisional && r ? "Provisional until 20 ranked games" : undefined}>
+            <div key={m.id} className="rounded-lg bg-surface-deep px-2 py-2">
               <div className={`font-display text-[17px] font-semibold tabular-nums ${r ? "text-text-primary" : "text-text-tertiary"}`}>
                 {r ? r.rating : "—"}
-                {r && provisional && <span className="text-text-tertiary">?</span>}
               </div>
               <div className="text-[11px] text-text-tertiary">{m.label}</div>
+              {r && placed < needed && (
+                <div
+                  className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-border"
+                  role="progressbar"
+                  aria-label={`${m.label} placement games`}
+                  aria-valuenow={placed}
+                  aria-valuemax={needed}
+                >
+                  <div className="h-full rounded-full bg-gold" style={{ width: `${(placed / needed) * 100}%` }} />
+                </div>
+              )}
             </div>
           );
         })}
       </div>
       <p className="mt-3 text-[12px] leading-snug text-text-tertiary">
         {account
-          ? "Everyone starts at 1500. The ? means provisional: your first 20 ranked games move it faster."
-          : "Each mode keeps its own rating. Your first 20 ranked games move it faster while it settles."}
+          ? "Everyone starts at 1500. Ratings move faster during placement: 10 games in 8-max modes, 20 in Heads-Up."
+          : "Each mode keeps its own rating, and it settles after a few placement games."}
       </p>
     </section>
   );
