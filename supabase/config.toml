@@ -178,6 +178,11 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Signup confirmation; the hosted project uses the same HTML (paste it into Auth → Emails → Confirm signup).
+[auth.email.template.confirmation]
+subject = "Confirm your Holdemics account"
+content_path = "./supabase/templates/confirmation.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

@@ -72,13 +72,17 @@ interface Action {
   amount?: number;
 }
 
-/** A Broadway straight, one of every suit, so the deck colours all show. */
+/**
+ * One of every suit so the deck colours all show. The board must not play for
+ * everyone (no straight or better on its own), or the showdown would be a chop
+ * and pushing the pot to one winner would be wrong.
+ */
 const BOARD: Card[] = [
   { rank: 14, suit: "s" },
   { rank: 13, suit: "h" },
-  { rank: 12, suit: "d" },
-  { rank: 11, suit: "c" },
-  { rank: 10, suit: "s" },
+  { rank: 8, suit: "d" },
+  { rank: 5, suit: "c" },
+  { rank: 2, suit: "s" },
 ];
 
 /** Seven seats around the far side; the dealer sits at the bottom. */
