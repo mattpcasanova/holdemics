@@ -46,10 +46,10 @@ export function RecentGames({ games, signedIn, now }: { games: PracticeGame[]; s
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-[13.5px] font-medium">
-                    {MODES[g.mode].name} vs {BOT_LEVELS[g.bot_level].name} bots
+                    {MODES[g.mode].name} vs {BOT_LEVELS[g.bot_level].name} {g.players === 2 ? "bot" : "bots"}
                   </div>
                   <div className="text-[12px] text-text-tertiary">
-                    {g.players} players, {g.hands} hands
+                    {g.players} players, {g.hands} {g.hands === 1 ? "hand" : "hands"}
                   </div>
                 </div>
                 <div className="text-right">
