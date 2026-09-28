@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/ui/Avatar";
 import { PlayerTitle } from "@/components/ui/PlayerTitle";
+import { Sparkline } from "@/components/ui/Sparkline";
 import type { Account } from "@/lib/account";
 import type { ModeId } from "@/lib/engine/modes";
 import { placementGames } from "@/lib/rating";
@@ -42,6 +43,11 @@ export function ProfileCard({ account }: { account: Account | null }) {
                 {r ? r.rating : "—"}
               </div>
               <div className="text-[11px] text-text-tertiary">{m.label}</div>
+              {account?.trend[m.id] && account.trend[m.id]!.length >= 2 && (
+                <div className="mt-1 flex justify-center">
+                  <Sparkline values={account.trend[m.id]!} width={64} height={18} label={`${m.label} rating over recent games`} />
+                </div>
+              )}
               {r && tier !== UNRANKED && (
                 <div
                   className="mt-1 truncate text-[11px] font-semibold"

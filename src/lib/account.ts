@@ -49,6 +49,8 @@ export interface PracticeGame {
 export interface Account {
   profile: Profile;
   ratings: Rating[];
+  /** Rating after each of the last ranked games per mode, oldest first (starts with the rating before the first). */
+  trend: Partial<Record<ModeId, number[]>>;
   recentPractice: PracticeGame[];
   recent: GameRecord[];
   /** When this snapshot was loaded; used for "2h ago" labels. */
@@ -60,7 +62,7 @@ export async function getAccount(): Promise<Account | null> {
   const viewer = await getViewer();
   if (!viewer) return null;
   const supabase = await createClient();
-  const [profile, ratings, practice, ranked] = await Promise.all([
+  const [profile, ratings, practice, ranked, history] = await Promise.all([
     supabase.from("profiles").select("id, username, avatar, title").eq("id", viewer.id).maybeSingle(),
     supabase.from("ratings").select("mode, rating, peak, games").eq("user_id", viewer.id),
     supabase
@@ -75,8 +77,20 @@ export async function getAccount(): Promise<Account | null> {
       .eq("user_id", viewer.id)
       .order("played_at", { ascending: false })
       .limit(8),
+    supabase
+      .from("ranked_games")
+      .select("mode, rating_before, rating_after, played_at")
+      .eq("user_id", viewer.id)
+      .order("played_at", { ascending: false })
+      .limit(60),
   ]);
   if (!profile.data) return null;
+
+  const trend: Partial<Record<ModeId, number[]>> = {};
+  for (const row of [...((history.data ?? []) as { mode: ModeId; rating_before: number; rating_after: number }[])].reverse()) {
+    const series = trend[row.mode] ?? (trend[row.mode] = [row.rating_before]);
+    if (series.length < 21) series.push(row.rating_after);
+  }
 
   const ratingRows = (ratings.data ?? []) as Omit<Rating, "rank">[];
   const ranks = await Promise.all(
@@ -99,6 +113,7 @@ export async function getAccount(): Promise<Account | null> {
   return {
     profile: profile.data as Profile,
     ratings: ratingRows.map((r, i) => ({ ...r, rank: ranks[i] })),
+    trend,
     recentPractice,
     recent,
     loadedAt: Date.now(),
