@@ -37,8 +37,12 @@ export interface SeatView {
   /** Selected profile title id, shown under the name. */
   title: string | null;
   isBot: boolean;
+  /** Difficulty of a bot seat. */
+  botLevel: BotLevel | null;
   connected: boolean;
   isHost: boolean;
+  /** Co-host: may add/kick bots and players and invite friends. */
+  isMod: boolean;
   sittingOut: boolean;
 }
 
@@ -90,8 +94,16 @@ export interface TableView {
 export type ClientMessage =
   | { type: "sit" }
   | { type: "stand" }
-  /** Host starts the game, adding `bots` bots to the empty seats (0 = none). */
-  | { type: "start"; bots?: number }
+  /** Host starts the game with whoever (and whatever bots) are seated. */
+  | { type: "start" }
+  /** Host or co-host seats a bot of the given difficulty. */
+  | { type: "addBot"; level: BotLevel }
+  /** Host or co-host empties a seat (player or bot). */
+  | { type: "kick"; seat: number }
+  /** Host resizes the table (2–9); only empty seats can be removed. */
+  | { type: "setSeats"; seats: number }
+  /** Host grants or revokes co-host powers. */
+  | { type: "setMod"; userId: string; on: boolean }
   | { type: "act"; action: Action; hand: number; step: number }
   | { type: "back" }
   | { type: "ping" };

@@ -41,6 +41,8 @@ interface PokerTableProps {
   botLabel?: string;
   /** Selected title id per seat, shown under names. */
   titles?: (string | null)[];
+  /** Per-seat bot labels, when bots differ in difficulty. */
+  botLabels?: (string | null)[];
 }
 
 type Point = { x: number; y: number };
@@ -152,6 +154,7 @@ export function PokerTable({
   fast = false,
   botLabel = "Bot",
   titles,
+  botLabels,
 }: PokerTableProps) {
   const [selected, setSelected] = useState<{ index: number; anchor: HTMLElement } | null>(null);
   const notes = useNotes();
@@ -400,7 +403,7 @@ export function PokerTable({
             player={game.players[selected.index]}
             isHero={selected.index === heroIndex}
             stats={stats[game.players[selected.index].id]}
-            botLabel={game.players[selected.index].isBot ? botLabel : null}
+            botLabel={game.players[selected.index].isBot ? (botLabels?.[selected.index] ?? botLabel) : null}
             onClose={() => setSelected(null)}
           />
         </Popover>

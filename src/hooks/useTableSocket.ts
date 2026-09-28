@@ -1,5 +1,6 @@
 "use client";
 
+import type { BotLevel } from "@/lib/engine/bots";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Action } from "@/lib/engine/game";
 import { playEventSounds, playRunoutSounds, playYourTurn } from "@/lib/practice/sounds";
@@ -103,7 +104,11 @@ export function useTableSocket(code: string, serverWs: string) {
     act,
     sit: () => send({ type: "sit" }),
     stand: () => send({ type: "stand" }),
-    start: (bots = 0) => send({ type: "start", bots }),
+    start: () => send({ type: "start" }),
+    addBot: (level: BotLevel) => send({ type: "addBot", level }),
+    kick: (seat: number) => send({ type: "kick", seat }),
+    setSeats: (seats: number) => send({ type: "setSeats", seats }),
+    setMod: (userId: string, on: boolean) => send({ type: "setMod", userId, on }),
     back: () => send({ type: "back" }),
   };
 }

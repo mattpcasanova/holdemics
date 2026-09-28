@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { type BotLevel, BOT_LEVELS } from "@/lib/engine/bots";
+import type { BotLevel } from "@/lib/engine/bots";
 import { MAX_SEATS, type ModeId } from "@/lib/engine/modes";
 
 const SPEEDS: { id: ModeId; label: string; blurb: string }[] = [
@@ -17,7 +17,7 @@ export function PlayWithFriends({ signedIn }: { signedIn: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<ModeId>("standard");
   const [seats, setSeats] = useState(6);
-  const [bots, setBots] = useState<BotLevel>("medium");
+  const bots: BotLevel = "medium";
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export function PlayWithFriends({ signedIn }: { signedIn: boolean }) {
         Play with friends
       </h2>
       <p className="mt-1 text-[12.5px] leading-snug text-text-secondary">
-        Start a private table and send the code. Add as many bots as you like when you start. Private games never change your rating.
+        Start a private table and send the code. Once inside, add bots of any difficulty, resize the table, and name co-hosts. Private games never change your rating.
       </p>
 
       {!signedIn ? (
@@ -84,18 +84,6 @@ export function PlayWithFriends({ signedIn }: { signedIn: boolean }) {
                 className={`h-7 w-7 rounded-md font-display text-[12px] font-semibold transition ${n === seats ? "bg-gold text-surface-primary" : "text-text-secondary hover:bg-white/5 hover:text-text-primary"}`}
               >
                 {n}
-              </button>
-            ))}
-          </div>
-          <div className="mt-1.5 flex items-center gap-2 text-[12px]">
-            <span className="text-text-tertiary">Bots</span>
-            {(Object.keys(BOT_LEVELS) as BotLevel[]).map((id) => (
-              <button
-                key={id}
-                onClick={() => setBots(id)}
-                className={`rounded-md px-2 py-1 transition ${id === bots ? "bg-white/10 font-medium" : "text-text-secondary hover:text-text-primary"}`}
-              >
-                {BOT_LEVELS[id].name}
               </button>
             ))}
           </div>

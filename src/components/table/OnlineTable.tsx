@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { PlayerTitle } from "@/components/ui/PlayerTitle";
+import { BOT_LEVEL_COLORS, BotIcon } from "@/components/ui/BotIcon";
 import { SettingsButton } from "@/components/ui/SettingsDialog";
 import { SoundToggle } from "@/components/ui/SoundToggle";
 import { useTableSocket } from "@/hooks/useTableSocket";
-import { BOT_LEVELS } from "@/lib/engine/bots";
+import { type BotLevel, BOT_LEVELS } from "@/lib/engine/bots";
 import { potTotal } from "@/lib/engine/game";
-import { MODES, blindsForLevel, describeLevelLength, formatHp } from "@/lib/engine/modes";
+import { MAX_SEATS, MODES, blindsForLevel, describeLevelLength, formatHp } from "@/lib/engine/modes";
 import { type StatsTable, accumulateHand } from "@/lib/stats";
 import { InviteFriends } from "@/components/friends/InviteFriends";
 import type { SeatView, TableView } from "@/lib/realtime/protocol";
@@ -25,8 +26,7 @@ interface OnlineTableProps {
 }
 
 export function OnlineTable({ code, serverWs }: OnlineTableProps) {
-  const { view, status, error, clearError, act, sit, stand, start, back } = useTableSocket(code, serverWs);
-  const [botCount, setBotCount] = useState(0);
+  const { view, status, error, clearError, act, sit, stand, start, addBot, kick, setSeats, setMod, back } = useTableSocket(code, serverWs);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dismissedResult, setDismissedResult] = useState(false);
@@ -48,8 +48,8 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
   const you = view.you;
   const hero = you ?? 0;
   const game = view.game;
-  const seatedHumans = view.seats.filter((s) => s.userId).length;
   const isHost = view.viewerId === view.config.hostId;
+  const canManage = isHost || view.seats.some((s) => s.userId === view.viewerId && s.isMod);
   const heroSeat = you !== null ? view.seats[you] : null;
   const ranked = !!view.config.ranked;
   const myUserId = view.viewerId;
@@ -181,6 +181,7 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
                 heroSittingOut={!!heroSeat?.sittingOut}
                 botLabel={`${BOT_LEVELS[view.config.botLevel].name} bot`}
                 titles={view.seats.map((s) => s.title)}
+                botLabels={view.seats.map((s) => (s.botLevel ? `${BOT_LEVELS[s.botLevel].name} bot` : null))}
               />
             ) : ranked ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
@@ -194,12 +195,16 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
                 view={view}
                 you={you}
                 isHost={isHost}
+                canManage={canManage}
                 onSit={sit}
                 onStand={stand}
-                onStart={() => start(botCount)}
-                seatedHumans={seatedHumans}
-                botCount={botCount}
-                onBotCount={setBotCount}
+                onStart={start}
+                onAddBot={addBot}
+                onKick={kick}
+                onSetSeats={setSeats}
+                onSetMod={setMod}
+                onCopy={copyLink}
+                copied={copied}
               />
             )}
           </div>
@@ -301,8 +306,14 @@ function SeatList({ seats, you }: { seats: SeatView[]; you: number | null }) {
                 <Avatar name={s.name} size={20} />
                 <span className={`flex-1 truncate ${s.index === you ? "font-medium text-gold" : "text-text-primary"}`}>{s.name}</span>
                 <PlayerTitle id={s.title} size={8.5} className="max-w-[90px]" />
-                {s.isHost && <span className="rounded-full border border-gold/40 px-1.5 text-[9px] font-semibold uppercase tracking-wider text-gold">Host</span>}
+                <RoleBadge seat={s} size="sm" />
                 {!s.connected && <span className="text-[10px] text-red-muted">away</span>}
+              </>
+            ) : s.isBot ? (
+              <>
+                <BotIcon size={20} color={BOT_LEVEL_COLORS[s.botLevel ?? "medium"]} />
+                <span className="flex-1 truncate text-text-secondary">{s.name}</span>
+                <span className="text-[10px] text-text-tertiary">{BOT_LEVELS[s.botLevel ?? "medium"].name} bot</span>
               </>
             ) : (
               <span className="flex-1 text-text-tertiary">Open seat</span>
@@ -314,35 +325,54 @@ function SeatList({ seats, you }: { seats: SeatView[]; you: number | null }) {
   );
 }
 
-/** The table before the first deal: who's seated, and the host's start button. */
+/** Host (gold) and co-host (felt) markers. */
+function RoleBadge({ seat, size = "md" }: { seat: SeatView; size?: "sm" | "md" }) {
+  if (!seat.isHost && !seat.isMod) return null;
+  const text = size === "sm" ? "text-[9px]" : "text-[9.5px]";
+  return seat.isHost ? (
+    <span className={`rounded-full border border-gold/40 px-1.5 font-semibold uppercase tracking-wider text-gold ${text}`}>Host</span>
+  ) : (
+    <span className={`rounded-full border border-felt-light/40 px-1.5 font-semibold uppercase tracking-wider text-felt-light ${text}`}>Co-host</span>
+  );
+}
+
 function LobbyTable({
   view,
   you,
   isHost,
-  seatedHumans,
+  canManage,
   onSit,
   onStand,
   onStart,
-  botCount,
-  onBotCount,
+  onAddBot,
+  onKick,
+  onSetSeats,
+  onSetMod,
+  onCopy,
+  copied,
 }: {
   view: TableView;
   you: number | null;
   isHost: boolean;
-  seatedHumans: number;
+  canManage: boolean;
   onSit: () => void;
   onStand: () => void;
   onStart: () => void;
-  botCount: number;
-  onBotCount: (n: number) => void;
+  onAddBot: (level: BotLevel) => void;
+  onKick: (seat: number) => void;
+  onSetSeats: (n: number) => void;
+  onSetMod: (userId: string, on: boolean) => void;
+  onCopy: () => void;
+  copied: boolean;
 }) {
   const total = view.seats.length;
-  const open = total - seatedHumans;
-  const bots = Math.min(botCount, open);
+  const seated = view.seats.filter((s) => s.userId || s.isBot).length;
+  const open = total - seated;
   // Rows that divide evenly: one row up to 7 seats, then 4+4 and 3+3+3.
   const cols = total <= 7 ? total : total === 8 ? 4 : 3;
+  const btn = "rounded-md border border-border px-2.5 py-1 text-[12px] text-text-secondary transition hover:bg-white/5 hover:text-text-primary disabled:opacity-40 disabled:hover:bg-transparent";
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
       <div>
         <div className="font-display text-[26px] font-semibold tracking-tight">Waiting for players</div>
         <div className="mt-1.5 flex justify-center">
@@ -352,61 +382,95 @@ function LobbyTable({
             <span className="rounded-full border border-border px-2.5 py-0.5 text-[11.5px] text-text-secondary">Hosted by {view.hostName ?? "a friend"}</span>
           )}
         </div>
-        <p className="mt-2 max-w-[48ch] text-[14px] text-text-secondary">
-          Share the code <span className="font-display font-semibold text-gold">{view.config.code}</span> or the page link. {seatedHumans} of {total} seats taken.
-          {isHost && open > 0 ? " Add bots below, or start with just the players here." : ""}
-        </p>
       </div>
-      <div className="grid justify-center gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 120px)` }}>
-        {view.seats.map((s) => (
-          <div key={s.index} className={`flex w-[120px] flex-col items-center gap-1.5 rounded-xl border p-3 ${s.userId ? "border-border bg-surface-deep" : "border-dashed border-white/15"}`}>
-            {s.userId ? (
-              <>
-                <Avatar name={s.name} size={36} ring={s.index === you ? "gold" : "none"} />
-                <span className="max-w-full truncate text-[12px] font-medium">{s.name}</span>
-                {s.isHost ? (
-                  <span className="rounded-full border border-gold/40 px-1.5 text-[9.5px] font-semibold uppercase tracking-wider text-gold">Host</span>
-                ) : (
-                  <span className="text-[10px] text-text-tertiary">{s.connected ? "Ready" : "Away"}</span>
-                )}
-              </>
-            ) : view.seats.slice(0, s.index).filter((x) => !x.userId).length < bots ? (
-              <>
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-card text-[14px]" aria-hidden>
-                  🤖
-                </div>
-                <span className="text-[12px] text-text-secondary">{BOT_LEVELS[view.config.botLevel].name} bot</span>
-                <span className="text-[10px] text-text-tertiary">Joins at start</span>
-              </>
-            ) : (
-              <>
-                <div className="h-9 w-9 rounded-full border border-dashed border-white/20" />
-                <span className="text-[12px] text-text-tertiary">Open</span>
-                <span className="text-[10px] text-text-tertiary">&nbsp;</span>
-              </>
-            )}
+
+      {/* Access code */}
+      <div className="flex items-stretch overflow-hidden rounded-xl border border-gold/40 bg-surface-deep">
+        <div className="flex flex-col justify-center px-4 py-2.5 text-left">
+          <span className="text-[10.5px] uppercase tracking-wider text-text-tertiary">Table code</span>
+          <span className="font-display text-[26px] font-semibold leading-none tracking-[0.18em] text-gold">{view.config.code}</span>
+        </div>
+        <button onClick={onCopy} className="border-l border-gold/30 px-4 text-[12.5px] text-text-secondary transition hover:bg-white/5 hover:text-text-primary" title="Copy invite link">
+          {copied ? "Copied" : "Copy link"}
+        </button>
+      </div>
+
+      <div className="grid justify-center gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 124px)` }}>
+        {view.seats.map((s) => {
+          const kickable = canManage && (s.userId || s.isBot) && !s.isHost && s.index !== you && (!s.isMod || isHost);
+          return (
+            <div key={s.index} className={`relative flex w-[124px] flex-col items-center gap-1.5 rounded-xl border p-3 ${s.userId || s.isBot ? "border-border bg-surface-deep" : "border-dashed border-white/15"}`}>
+              {kickable && (
+                <button
+                  onClick={() => onKick(s.index)}
+                  aria-label={`Remove ${s.name}`}
+                  title="Remove from table"
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface-primary text-[12px] leading-none text-text-tertiary hover:border-red/50 hover:text-[#EFA3A3]"
+                >
+                  ×
+                </button>
+              )}
+              {s.userId ? (
+                <>
+                  <Avatar name={s.name} size={36} ring={s.index === you ? "gold" : "none"} />
+                  <span className="max-w-full truncate text-[12px] font-medium">{s.name}</span>
+                  {s.isHost || s.isMod ? <RoleBadge seat={s} /> : <span className="text-[10px] text-text-tertiary">{s.connected ? "Ready" : "Away"}</span>}
+                  {isHost && !s.isHost && (
+                    <button onClick={() => onSetMod(s.userId!, !s.isMod)} className="text-[10px] text-text-tertiary underline-offset-2 hover:text-text-primary hover:underline">
+                      {s.isMod ? "Remove co-host" : "Make co-host"}
+                    </button>
+                  )}
+                </>
+              ) : s.isBot ? (
+                <>
+                  <BotIcon size={36} color={BOT_LEVEL_COLORS[s.botLevel ?? "medium"]} />
+                  <span className="max-w-full truncate text-[12px] font-medium text-text-secondary">{s.name}</span>
+                  <span className="text-[10px]" style={{ color: BOT_LEVEL_COLORS[s.botLevel ?? "medium"] }}>{BOT_LEVELS[s.botLevel ?? "medium"].name} bot</span>
+                </>
+              ) : (
+                <>
+                  <div className="h-9 w-9 rounded-full border border-dashed border-white/20" />
+                  <span className="text-[12px] text-text-tertiary">Open</span>
+                  <span className="text-[10px] text-text-tertiary">&nbsp;</span>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {canManage && open > 0 && <InviteFriends code={view.config.code} modeId={view.config.mode} seatedIds={view.seats.map((s) => s.userId).filter((id): id is string => !!id)} />}
+
+      {canManage && (
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-lg border border-border bg-surface-deep px-3 py-2 text-[13px]">
+          <div className="flex items-center gap-1.5">
+            <span className="mr-1 text-text-secondary">Add bot</span>
+            {(Object.keys(BOT_LEVELS) as BotLevel[]).map((level) => (
+              <button key={level} onClick={() => onAddBot(level)} disabled={open === 0} className={btn} title={BOT_LEVELS[level].blurb}>
+                <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ background: BOT_LEVEL_COLORS[level] }} />
+                {BOT_LEVELS[level].name}
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
-      {open > 0 && <InviteFriends code={view.config.code} modeId={view.config.mode} seatedIds={view.seats.map((s) => s.userId).filter((id): id is string => !!id)} />}
-      {isHost && open > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-deep px-3 py-2 text-[13px]">
-          <span className="text-text-secondary">Bots</span>
-          <button onClick={() => onBotCount(Math.max(0, bots - 1))} disabled={bots === 0} aria-label="Fewer bots" className="h-7 w-7 rounded-md border border-border text-text-secondary hover:bg-white/5 disabled:opacity-40">
-            −
-          </button>
-          <span className="w-4 text-center font-display text-[15px] font-semibold tabular-nums">{bots}</span>
-          <button onClick={() => onBotCount(Math.min(open, bots + 1))} disabled={bots >= open} aria-label="More bots" className="h-7 w-7 rounded-md border border-border text-text-secondary hover:bg-white/5 disabled:opacity-40">
-            +
-          </button>
-          <span className="text-text-tertiary">
-            {seatedHumans + bots} of {total} seats · {BOT_LEVELS[view.config.botLevel].name}
-          </span>
+          {isHost && (
+            <div className="flex items-center gap-1.5">
+              <span className="mr-1 text-text-secondary">Seats</span>
+              <button onClick={() => onSetSeats(total - 1)} disabled={total <= 2 || open === 0} aria-label="Fewer seats" className={`${btn} h-7 w-7 px-0`}>
+                −
+              </button>
+              <span className="w-4 text-center font-display text-[15px] font-semibold tabular-nums">{total}</span>
+              <button onClick={() => onSetSeats(total + 1)} disabled={total >= MAX_SEATS} aria-label="More seats" className={`${btn} h-7 w-7 px-0`}>
+                +
+              </button>
+            </div>
+          )}
+          <span className="text-text-tertiary">{seated} of {total} seats taken</span>
         </div>
       )}
+
       <div className="flex gap-2">
         {you === null ? (
-          <button onClick={onSit} className="rounded-lg bg-gold px-5 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110">
+          <button onClick={onSit} disabled={open === 0} className="rounded-lg bg-gold px-5 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110 disabled:opacity-50">
             Take a seat
           </button>
         ) : (
@@ -417,10 +481,10 @@ function LobbyTable({
         {isHost && (
           <button
             onClick={onStart}
-            disabled={seatedHumans + bots < 2}
+            disabled={seated < 2}
             className="rounded-lg bg-felt px-5 py-2.5 font-display text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-50"
           >
-            Start with {seatedHumans + bots} {seatedHumans + bots === 1 ? "player" : "players"}
+            Start with {seated} {seated === 1 ? "player" : "players"}
           </button>
         )}
       </div>

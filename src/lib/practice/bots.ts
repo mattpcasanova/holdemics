@@ -8,8 +8,8 @@ const NAMES = [
   "slowroll_sal", "overbet_olly", "nit_nancy", "suited_sam", "whale_watch",
 ];
 
-export function botSeats(count: number, level: BotLevel, rng: () => number = Math.random): SeatInfo[] {
-  const pool = [...NAMES];
+export function botSeats(count: number, level: BotLevel, rng: () => number = Math.random, avoid: Set<string> = new Set()): SeatInfo[] {
+  const pool = NAMES.filter((n) => !avoid.has(n));
   const seats: SeatInfo[] = [];
   for (let i = 0; i < count; i++) {
     const [name] = pool.splice(Math.floor(rng() * pool.length), 1);

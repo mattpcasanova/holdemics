@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { decideBotAction } from "@/lib/engine/bots";
+import { type BotLevel, BOT_LEVELS, decideBotAction } from "@/lib/engine/bots";
 import {
   type GameState,
   type LogEvent,
@@ -10,7 +10,7 @@ import {
   legalActions,
   startHand,
 } from "@/lib/engine/game";
-import { MODES } from "@/lib/engine/modes";
+import { MAX_SEATS, MODES } from "@/lib/engine/modes";
 import { botSeats } from "@/lib/practice/bots";
 import { maskResult, runoutSchedule } from "@/lib/practice/runout";
 import { DEAL_STAGGER_MS } from "@/lib/practice/timing";
@@ -43,6 +43,9 @@ interface Seat {
   /** Selected profile title, shown under the name. */
   title?: string | null;
   isBot: boolean;
+  botLevel?: BotLevel;
+  /** Co-host: can add/kick bots and players. */
+  mod?: boolean;
   sittingOut: boolean;
   bankMs: number;
 }
@@ -99,6 +102,7 @@ const freshFacts = (): SeatFacts => ({
 });
 
 const RANKED_START_TIMEOUT_MS = 30_000;
+const EMPTY_SEAT = (): Seat => ({ userId: null, name: "", isBot: false, sittingOut: false, bankMs: 0 });
 
 interface Attachment {
   userId: string;
@@ -217,9 +221,53 @@ export class TableRoom extends DurableObject<Env> {
         break;
       case "start":
         if (this.state.config.ranked) return;
-        if (who.userId !== this.state.config.hostId) return this.send(ws, { type: "error", message: "Only the host can start the game." });
-        if (!this.startGame(msg.bots ?? 0)) return this.send(ws, { type: "error", message: "A game needs at least two players. Add a bot or wait for a friend." });
+        if (!this.isHost(who)) return this.send(ws, { type: "error", message: "Only the host can start the game." });
+        if (!this.startGame()) return this.send(ws, { type: "error", message: "A game needs at least two players. Add a bot or wait for a friend." });
         break;
+      case "addBot": {
+        if (this.state.config.ranked || this.state.phase !== "lobby") return;
+        if (!this.canManage(who)) return this.send(ws, { type: "error", message: "Only the host or a co-host can add bots." });
+        if (!(msg.level in BOT_LEVELS)) return;
+        const empty = this.state.seats.findIndex((x) => !x.userId && !x.isBot);
+        if (empty < 0) return this.send(ws, { type: "error", message: "No open seat. Make the table bigger first." });
+        const used = new Set(this.state.seats.map((x) => x.name));
+        const [bot] = botSeats(1, msg.level, Math.random, used);
+        this.state.seats[empty] = { ...EMPTY_SEAT(), isBot: true, name: bot.name, botLevel: msg.level };
+        break;
+      }
+      case "kick": {
+        if (this.state.config.ranked || this.state.phase !== "lobby") return;
+        if (!this.canManage(who)) return this.send(ws, { type: "error", message: "Only the host or a co-host can remove players." });
+        const target = this.state.seats[msg.seat];
+        if (!target || (!target.userId && !target.isBot)) return;
+        if (target.userId === this.state.config.hostId) return this.send(ws, { type: "error", message: "The host can't be removed." });
+        if (target.mod && !this.isHost(who)) return this.send(ws, { type: "error", message: "Only the host can remove a co-host." });
+        this.state.seats[msg.seat] = EMPTY_SEAT();
+        break;
+      }
+      case "setSeats": {
+        if (this.state.config.ranked || this.state.phase !== "lobby") return;
+        if (!this.isHost(who)) return this.send(ws, { type: "error", message: "Only the host can resize the table." });
+        const n = msg.seats;
+        if (!Number.isInteger(n) || n < 2 || n > MAX_SEATS) return;
+        const taken = this.state.seats.filter((x) => x.userId || x.isBot);
+        if (taken.length > n) return this.send(ws, { type: "error", message: `${taken.length} seats are taken; remove someone before shrinking to ${n}.` });
+        // Keep everyone in place and remove or add empty seats at the end.
+        let seats = [...this.state.seats];
+        for (let i = seats.length - 1; i >= 0 && seats.length > n; i--) if (!seats[i].userId && !seats[i].isBot) seats.splice(i, 1);
+        while (seats.length < n) seats.push(EMPTY_SEAT());
+        this.state.seats = seats;
+        this.state.config = { ...this.state.config, seats: n };
+        break;
+      }
+      case "setMod": {
+        if (this.state.config.ranked) return;
+        if (!this.isHost(who)) return this.send(ws, { type: "error", message: "Only the host can name co-hosts." });
+        const target = this.state.seats.find((x) => x.userId === msg.userId);
+        if (!target || target.userId === this.state.config.hostId) return;
+        target.mod = !!msg.on;
+        break;
+      }
       case "back":
         if (seat >= 0) this.state.seats[seat].sittingOut = false;
         break;
@@ -293,7 +341,7 @@ export class TableRoom extends DurableObject<Env> {
         break;
       case "bot":
         if (g.phase === "betting" && g.toAct !== null && s.seats[g.toAct].isBot) {
-          this.transition(applyAction(g, decideBotAction(g, s.config.botLevel)));
+          this.transition(applyAction(g, decideBotAction(g, s.seats[g.toAct!]?.botLevel ?? s.config.botLevel)));
         }
         break;
       case "sitout":
@@ -318,6 +366,15 @@ export class TableRoom extends DurableObject<Env> {
 
   // ─── Lobby ───────────────────────────────────────────────
 
+  private isHost(who: Attachment) {
+    return who.userId === this.state!.config.hostId;
+  }
+
+  /** Hosts and co-hosts manage the lobby (bots, kicks, invites). */
+  private canManage(who: Attachment) {
+    return this.isHost(who) || this.state!.seats.some((x) => x.userId === who.userId && x.mod);
+  }
+
   private sit(who: Attachment) {
     const s = this.state!;
     if (s.phase !== "lobby") return;
@@ -331,37 +388,22 @@ export class TableRoom extends DurableObject<Env> {
     const s = this.state!;
     if (s.phase !== "lobby") return;
     const i = s.seats.findIndex((x) => x.userId === who.userId);
-    if (i >= 0) s.seats[i] = { userId: null, name: "", isBot: false, sittingOut: false, bankMs: 0 };
+    if (i >= 0) s.seats[i] = EMPTY_SEAT();
   }
 
   /**
-   * Start with the seated humans plus `botCount` bots (ranked: everyone is
-   * seated already and no bots are added). Empty seats beyond that are
-   * removed so the game has exactly the players at the table.
+   * Start with whoever is seated, humans and bots alike (ranked: everyone is
+   * seated already). Empty seats are removed so the game has exactly the
+   * players at the table.
    */
-  private startGame(botCount = 0): boolean {
+  private startGame(): boolean {
     const s = this.state!;
     if (s.phase !== "lobby") return false;
-    const humans = s.seats.filter((x) => x.userId);
-    if (humans.length === 0) return false;
-
-    const open = s.seats.filter((x) => !x.userId).length;
-    const bots = s.config.ranked ? [] : botSeats(Math.max(0, Math.min(botCount, open)), s.config.botLevel);
-    let b = 0;
-    for (const seat of s.seats) {
-      if (seat.userId || b >= bots.length) continue;
-      const bot = bots[b++];
-      seat.isBot = true;
-      seat.name = bot.name;
-      seat.userId = null;
-    }
+    if (!s.seats.some((x) => x.userId)) return false;
+    const seated = s.seats.filter((x) => x.userId || x.isBot);
+    if (seated.length < 2) return false;
     // Drop empty seats; players keep their relative order around the table.
-    s.seats = s.seats.filter((x) => x.userId || x.isBot);
-    if (s.seats.length < 2) {
-      for (const seat of s.seats) if (seat.isBot) Object.assign(seat, { isBot: false, name: "" });
-      s.seats = Array.from({ length: s.config.ranked ? MODES[s.config.mode].seats : s.config.seats }, (_, i) => s.seats[i] ?? { userId: null, name: "", isBot: false, sittingOut: false, bankMs: 0 });
-      return false;
-    }
+    s.seats = seated;
     const seats: SeatInfo[] = s.seats.map((seat, i) => ({ id: seat.userId ?? `bot-${i}`, name: seat.name, isBot: seat.isBot }));
     const bank = MODES[s.config.mode].timeBankSeconds * 1000;
     for (const seat of s.seats) seat.bankMs = seat.isBot ? 0 : bank;
@@ -625,8 +667,10 @@ export class TableRoom extends DurableObject<Env> {
         name: seat.name,
         title: seat.title ?? null,
         isBot: seat.isBot,
+        botLevel: seat.isBot ? (seat.botLevel ?? s.config.botLevel) : null,
         connected: seat.isBot || (seat.userId !== null && this.isConnected(seat.userId)),
         isHost: seat.userId === s.config.hostId,
+        isMod: !!seat.mod,
         sittingOut: seat.sittingOut,
       })),
       game,
