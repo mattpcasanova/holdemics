@@ -16,7 +16,7 @@
   "vars": {
     "SUPABASE_URL": "https://flfuvcxbvfviwatnwsnw.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_M8prsR7oy_yKiDW4QxR9-A_u8jsE_Sh",
-    "ALLOWED_ORIGIN": "http://localhost:3100"
+    "ALLOWED_ORIGIN": "http://localhost:3100,https://holdemics.vercel.app"
   },
   "dev": { "port": 8787 }
 }

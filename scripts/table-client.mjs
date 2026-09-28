@@ -10,6 +10,7 @@
  *   node scripts/table-client.mjs --as friend --code ABC123 [--strategy call|shove] [--seconds 90]
  *   node scripts/table-client.mjs --as matt --queue headsup --strategy shove
  *   node scripts/table-client.mjs --as matt --queue headsup --noshow   (match, then never connect)
+ *   TABLE_WS=wss://<worker> node scripts/table-client.mjs …           (against a deployed Worker)
  */
 import { readFileSync } from "node:fs";
 
@@ -19,6 +20,8 @@ const env = Object.fromEntries(
     .filter((l) => l.includes("=") && !l.startsWith("#"))
     .map((l) => l.split("=", 2).map((s) => s.trim())),
 );
+// TABLE_WS=wss://… points the script at a deployed Worker instead of the local one.
+if (process.env.TABLE_WS) env.NEXT_PUBLIC_TABLE_SERVER_WS = process.env.TABLE_WS;
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => (a.startsWith("--") ? [a.slice(2), all[i + 1]] : [])).filter((e) => e.length));
 const who = args.as ?? "friend";

@@ -52,6 +52,9 @@ npm test                             # Engine + rating tests
 npm run simulate -- standard 100     # Bot sims: hands/game and avg place per difficulty
 cd server && npm run dev             # Table server (Cloudflare Worker, local, port 8787)
 node scripts/table-client.mjs CODE   # Scripted second player for two-human table tests (uses TEST_FRIEND_* in .env.local)
+TABLE_WS=wss://holdemics-tables.holdemics-table-server.workers.dev node scripts/table-client.mjs …  # same, against production
+cd server && npm run deploy          # Deploy the table server (wrangler, logged in to Cloudflare)
+vercel deploy --prod                 # Deploy the app manually (pushes to main also auto-deploy)
 ```
 
 ## Game Rules (source of truth: src/lib/engine)
@@ -73,18 +76,20 @@ node scripts/table-client.mjs CODE   # Scripted second player for two-human tabl
 - **Tables**: `profiles` (public read, own update of username/avatar), `ratings` (per mode, public read, server-only writes), `user_settings` (jsonb), `player_notes` (private), `practice_games` (own history). All RLS-enabled with `(select auth.uid())` ownership checks.
 - **Signup**: `private.handle_new_user()` trigger creates profile + 3 rating rows + settings. The requested username comes from signup metadata (user-editable), so it is sanitized and de-duplicated in the trigger and only used as a display name.
 - **Sync**: `AccountSync` (mounted in the root layout) loads settings/notes on sign-in (account wins, guest-only data is uploaded) and saves changes back with a debounce. Local stores stay the source of truth for the UI.
-- **Email confirm**: `/auth/confirm` accepts both `?code=` (default PKCE link) and `?token_hash=&type=`. The dev project has Site URL `http://localhost:3100` and `http://localhost:3100/**` on the redirect allow list.
+- **Email confirm**: `/auth/confirm` accepts both `?code=` (default PKCE link) and `?token_hash=&type=`. The project has Site URL `http://localhost:3100` and both `http://localhost:3100/**` and `https://holdemics.vercel.app/**` on the redirect allow list (signup passes its own origin as the redirect).
 - **Dev project**: `flfuvcxbvfviwatnwsnw` ("holdemics", Free org). Test account credentials are in `.env.local` (`TEST_ACCOUNT_*`). The MCP SQL tool is read-only; writes to `auth.*` go through the dashboard SQL editor.
 
 ## Table Server (private tables)
 
-- **Where**: `server/` is a separate Cloudflare Worker package (own `package.json`, `tsconfig`, `wrangler.jsonc`). One SQLite-backed Durable Object (`TableRoom`) per table; run locally with `cd server && npm run dev` (port 8787, no Cloudflare login needed). Deploy with `npm run deploy` once a Cloudflare account is linked.
+- **Where**: `server/` is a separate Cloudflare Worker package (own `package.json`, `tsconfig`, `wrangler.jsonc`). One SQLite-backed Durable Object (`TableRoom`) per table; run locally with `cd server && npm run dev` (port 8787, no Cloudflare login needed). Deploy with `npm run deploy`.
 - **Imports the engine directly** via the `@/*` path alias pointing at `../src/*`; keep `src/lib/engine`, `src/lib/practice/{runout,timing,sounds,bots}` and `src/lib/realtime/*` free of browser-only code.
 - **Lobby**: the host (`config.hostId`, shown as "You're hosting" / "Hosted by …" via `TableView.hostName`) manages the table without needing a seat; `TableView.viewerId` identifies the viewer even when unseated. Bots are real lobby seats added one at a time with their own difficulty (`addBot`, `Seat.botLevel`; the bot alarm uses the seat's level). Host and **co-hosts** (`Seat.mod`, granted with `setMod`, shown with a felt "Co-host" badge vs the gold "Host" badge) can `kick` any seat except the host (only the host can kick a co-host; the host can `kick` with `block: true`, which stops that player sitting again until `unblock`, sent by the lobby's "Invite back" button alongside a friend invite) and see the invite list; only the host resizes with `setSeats` (2–9, empty seats trimmed from the end) and starts. The `tables.seats` DB column keeps the size at creation only.
 - **Flow**: `POST /api/tables` (Next) inserts a `tables` row and calls the Worker `POST /tables/:code/create` with `TABLE_SERVER_SECRET`. The page `/table/[code]` opens `ws://…/tables/:code/ws?token=<supabase access token>`; the Worker verifies the JWT against the project JWKS and reads the username from `profiles`, so names are never client-claimed.
 - **Views**: the room sends each socket a `TableView` with `redactGame()` applied (own hole cards only, all at showdown, no deck). During an all-in runout it sends `maskResult()` output plus `runout` timing, and the result after `runoutSchedule().doneAt`.
 - **Clocks and bots** run on a single Durable Object alarm (`state.due`); every transition persists to storage first. Clock expiry auto check/folds and sits the player out until they send `back`.
 - **Actions** carry `hand` and `step` (server transition counter) and are dropped if stale.
+- **Production**: app at https://holdemics.vercel.app (Vercel project `holdemics` under Matt Casanova's projects; linked to GitHub, so pushes to `main` deploy). Worker `holdemics-tables` at https://holdemics-tables.holdemics-table-server.workers.dev (`wss://` for sockets). `ALLOWED_ORIGIN` in `server/wrangler.jsonc` lists localhost and the production origin; add any custom domain there and to Supabase's redirect allow list.
+- **Secret rotation**: `TABLE_SERVER_SECRET` must match in four places: Worker secret (`npx wrangler secret put TABLE_SERVER_SECRET`), Vercel env (Production), Vault `table_server_secret` (`vault.update_secret` in the dashboard SQL editor), and local `.env.local` + `server/.dev.vars`.
 - **Env**: `NEXT_PUBLIC_TABLE_SERVER_WS`, `TABLE_SERVER_URL`, `TABLE_SERVER_SECRET` (Next); `server/.dev.vars` holds the Worker's copy of the secret locally.
 - **Housekeeping**: a pg_cron job (`prune-stale-rows`, 04:17 UTC) deletes `tables` and `table_invites` rows older than a day via `private.prune_stale_rows()`; Durable Object state simply goes idle.
 - **Requeue**: the ranked result dialog's "Find another match" sends the player to `/?queue=<mode>`; the lobby selects that mode and `RankedButton` auto-joins once.
@@ -137,7 +142,7 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 3. ~~Server-authoritative multiplayer — private friend tables, unrated~~ (done; see Table Server)
 4. ~~Ranked matchmaking~~ (done; 8-max queues exist but need 8 concurrent players)
 5. ~~Achievements, titles, unlockable card backs, table skins, avatars~~ (done)
-6. Deploy the table server (needs `wrangler login`; `ALLOWED_ORIGIN` takes a comma-separated list) and link Vercel
+6. ~~Deploy the table server and link Vercel~~ (done 2026-09-28; see Table Server → Production)
 
 ## Known Issues / Gotchas
 
