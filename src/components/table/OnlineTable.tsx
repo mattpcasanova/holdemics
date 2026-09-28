@@ -13,6 +13,7 @@ import { potTotal } from "@/lib/engine/game";
 import { MAX_SEATS, MODES, blindsForLevel, describeLevelLength, formatHp } from "@/lib/engine/modes";
 import { type StatsTable, accumulateHand } from "@/lib/stats";
 import { InviteFriends } from "@/components/friends/InviteFriends";
+import { sendInvite } from "@/lib/presence";
 import type { SeatView, TableView } from "@/lib/realtime/protocol";
 import { ActionBar } from "./ActionBar";
 import { HandLog } from "./HandLog";
@@ -26,7 +27,7 @@ interface OnlineTableProps {
 }
 
 export function OnlineTable({ code, serverWs }: OnlineTableProps) {
-  const { view, status, error, clearError, act, sit, stand, start, addBot, kick, setSeats, setMod, back } = useTableSocket(code, serverWs);
+  const { view, status, error, clearError, act, sit, stand, start, addBot, kick, unblock, setSeats, setMod, back } = useTableSocket(code, serverWs);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dismissedResult, setDismissedResult] = useState(false);
@@ -201,6 +202,7 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
                 onStart={start}
                 onAddBot={addBot}
                 onKick={kick}
+                onUnblock={unblock}
                 onSetSeats={setSeats}
                 onSetMod={setMod}
                 onCopy={copyLink}
@@ -346,6 +348,7 @@ function LobbyTable({
   onStart,
   onAddBot,
   onKick,
+  onUnblock,
   onSetSeats,
   onSetMod,
   onCopy,
@@ -359,7 +362,8 @@ function LobbyTable({
   onStand: () => void;
   onStart: () => void;
   onAddBot: (level: BotLevel) => void;
-  onKick: (seat: number) => void;
+  onKick: (seat: number, block?: boolean) => void;
+  onUnblock: (userId: string) => void;
   onSetSeats: (n: number) => void;
   onSetMod: (userId: string, on: boolean) => void;
   onCopy: () => void;
@@ -416,9 +420,14 @@ function LobbyTable({
                   <span className="max-w-full truncate text-[12px] font-medium">{s.name}</span>
                   {s.isHost || s.isMod ? <RoleBadge seat={s} /> : <span className="text-[10px] text-text-tertiary">{s.connected ? "Ready" : "Away"}</span>}
                   {isHost && !s.isHost && (
-                    <button onClick={() => onSetMod(s.userId!, !s.isMod)} className="text-[10px] text-text-tertiary underline-offset-2 hover:text-text-primary hover:underline">
-                      {s.isMod ? "Remove co-host" : "Make co-host"}
-                    </button>
+                    <span className="flex gap-2 text-[10px] text-text-tertiary">
+                      <button onClick={() => onSetMod(s.userId!, !s.isMod)} className="underline-offset-2 hover:text-text-primary hover:underline">
+                        {s.isMod ? "Remove co-host" : "Make co-host"}
+                      </button>
+                      <button onClick={() => onKick(s.index, true)} title="Remove and don't let them sit again until you invite them back" className="underline-offset-2 hover:text-[#EFA3A3] hover:underline">
+                        Block
+                      </button>
+                    </span>
                   )}
                 </>
               ) : s.isBot ? (
@@ -439,7 +448,32 @@ function LobbyTable({
         })}
       </div>
 
-      {canManage && open > 0 && <InviteFriends code={view.config.code} modeId={view.config.mode} seatedIds={view.seats.map((s) => s.userId).filter((id): id is string => !!id)} />}
+      {canManage && open > 0 && (
+        <InviteFriends
+          code={view.config.code}
+          modeId={view.config.mode}
+          seatedIds={[...view.seats.map((s) => s.userId).filter((id): id is string => !!id), ...view.blocked.map((b) => b.userId)]}
+        />
+      )}
+      {isHost && view.blocked.length > 0 && (
+        <div className="flex flex-wrap items-center justify-center gap-2 text-[12px] text-text-tertiary">
+          <span>Blocked:</span>
+          {view.blocked.map((b) => (
+            <span key={b.userId} className="flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5">
+              <span className="text-text-secondary">{b.name}</span>
+              <button
+                onClick={async () => {
+                  onUnblock(b.userId);
+                  await sendInvite(b.userId, view.config.code, view.config.mode);
+                }}
+                className="text-gold underline-offset-2 hover:underline"
+              >
+                Invite back
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {canManage && (
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-lg border border-border bg-surface-deep px-3 py-2 text-[13px]">

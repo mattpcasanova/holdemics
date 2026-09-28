@@ -77,6 +77,8 @@ interface TableState {
   cancelled?: string;
   /** Per-seat facts gathered over the game for achievements. */
   facts?: Record<number, SeatFacts>;
+  /** Removed by the host; can't sit again until unblocked. */
+  blocked?: { userId: string; name: string }[];
   achievements?: Record<string, string[]>;
 }
 
@@ -213,6 +215,7 @@ export class TableRoom extends DurableObject<Env> {
         return;
       case "sit":
         if (this.state.config.ranked) return;
+        if (this.state.blocked?.some((b) => b.userId === who.userId)) return this.send(ws, { type: "error", message: "The host removed you from this table. You'll need a new invite to sit." });
         this.sit(who);
         break;
       case "stand":
@@ -242,9 +245,16 @@ export class TableRoom extends DurableObject<Env> {
         if (!target || (!target.userId && !target.isBot)) return;
         if (target.userId === this.state.config.hostId) return this.send(ws, { type: "error", message: "The host can't be removed." });
         if (target.mod && !this.isHost(who)) return this.send(ws, { type: "error", message: "Only the host can remove a co-host." });
+        if (msg.block && target.userId && this.isHost(who)) {
+          this.state.blocked = [...(this.state.blocked ?? []).filter((b) => b.userId !== target.userId), { userId: target.userId, name: target.name }];
+        }
         this.state.seats[msg.seat] = EMPTY_SEAT();
         break;
       }
+      case "unblock":
+        if (!this.isHost(who)) return;
+        this.state.blocked = (this.state.blocked ?? []).filter((b) => b.userId !== msg.userId);
+        break;
       case "setSeats": {
         if (this.state.config.ranked || this.state.phase !== "lobby") return;
         if (!this.isHost(who)) return this.send(ws, { type: "error", message: "Only the host can resize the table." });
@@ -661,6 +671,7 @@ export class TableRoom extends DurableObject<Env> {
       phase: s.phase,
       viewerId: who.userId,
       hostName,
+      blocked: s.blocked ?? [],
       seats: s.seats.map((seat, index) => ({
         index,
         userId: seat.userId,

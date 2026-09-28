@@ -72,6 +72,8 @@ export interface TableView {
   viewerId: string;
   /** Display name of the host, when known (seated or connected). */
   hostName: string | null;
+  /** Players removed by the host who can't sit until invited back. */
+  blocked: { userId: string; name: string }[];
   /** Redacted engine state; null in the lobby before the first deal. */
   game: GameState | null;
   /** Index of the viewer in `game.players`, or null when spectating. */
@@ -98,8 +100,10 @@ export type ClientMessage =
   | { type: "start" }
   /** Host or co-host seats a bot of the given difficulty. */
   | { type: "addBot"; level: BotLevel }
-  /** Host or co-host empties a seat (player or bot). */
-  | { type: "kick"; seat: number }
+  /** Host or co-host empties a seat (player or bot). Host may also block the player from re-sitting. */
+  | { type: "kick"; seat: number; block?: boolean }
+  /** Host lets a blocked player sit again (used when inviting them back). */
+  | { type: "unblock"; userId: string }
   /** Host resizes the table (2–9); only empty seats can be removed. */
   | { type: "setSeats"; seats: number }
   /** Host grants or revokes co-host powers. */
