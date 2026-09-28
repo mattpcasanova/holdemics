@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Avatar } from "@/components/ui/Avatar";
+import { TagIcon } from "@/components/ui/TagIcon";
 import { type BotLevel, BOT_LEVELS } from "@/lib/engine/bots";
 import { type ModeId, MODES } from "@/lib/engine/modes";
+import { type PlayerTag, PLAYER_TAGS } from "@/lib/notes";
 
-const LEVELS: { id: BotLevel; face: string; pips: number }[] = [
-  { id: "easy", face: "pocket_rox", pips: 1 },
-  { id: "medium", face: "the_grinder", pips: 2 },
-  { id: "hard", face: "felt_ghost", pips: 3 },
+// Each level wears the player tag that describes how it plays.
+const LEVELS: { id: BotLevel; tag: PlayerTag; pips: number }[] = [
+  { id: "easy", tag: "fish", pips: 1 },
+  { id: "medium", tag: "reg", pips: 2 },
+  { id: "hard", tag: "shark", pips: 3 },
 ];
 
 export function PracticePicker() {
@@ -41,7 +43,12 @@ export function PracticePicker() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <Avatar name={l.face} size={36} ring={selected ? "gold" : "none"} />
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-full"
+                  style={{ backgroundColor: `color-mix(in srgb, ${PLAYER_TAGS[l.tag].color} 16%, transparent)` }}
+                >
+                  <TagIcon tag={l.tag} size={20} />
+                </span>
                 <div className="flex gap-1" aria-label={`Difficulty ${l.pips} of 3`}>
                   {[1, 2, 3].map((p) => (
                     <span key={p} className={`h-1.5 w-4 rounded-full ${p <= l.pips ? "bg-gold" : "bg-border"}`} />

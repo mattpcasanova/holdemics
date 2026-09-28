@@ -47,7 +47,7 @@ export default {
       if (!originAllowed(origin, env)) return json({ error: "Origin not allowed" }, 403);
       const token = url.searchParams.get("token") ?? "";
       const who = token ? await identify(token, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY) : null;
-      if (!who) return json({ error: "Sign in to play ranked" }, 401);
+      if (!who || who.anonymous) return json({ error: "Sign in to play ranked" }, 401);
       const rating = await fetch(`${env.SUPABASE_URL}/rest/v1/ratings?user_id=eq.${who.userId}&mode=eq.${mode}&select=rating,games`, {
         headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` },
       })

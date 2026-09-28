@@ -86,6 +86,17 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
       const key = e.key.toLowerCase();
       const step = (e.shiftKey ? 5 : 1) * bigBlind;
 
+      // Enter bets/raises the current size; Space checks when free, otherwise folds.
+      if (key === "enter" || key === " ") {
+        e.preventDefault();
+        if (e.repeat) return;
+        // Drop focus so a focused button isn't also activated by the same key.
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        if (key === " ") onAct({ type: legal.canCheck ? "check" : "fold" });
+        else if (legal.canRaise) onAct({ type: "raise", to: size });
+        return;
+      }
+
       if (key === "f" && !legal.canCheck) onAct({ type: "fold" });
       else if (key === "c") onAct({ type: legal.canCheck ? "check" : "call" });
       else if ((key === "r" || key === "b") && legal.canRaise) onAct({ type: "raise", to: size });
@@ -181,15 +192,15 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
           </div>
         )}
         {!legal.canCheck && (
-          <ActionButton tone="fold" hotkey="F" onClick={() => onAct({ type: "fold" })}>
+          <ActionButton tone="fold" hotkey="F · Space" onClick={() => onAct({ type: "fold" })}>
             Fold
           </ActionButton>
         )}
-        <ActionButton tone="neutral" hotkey="C" onClick={() => onAct({ type: legal.canCheck ? "check" : "call" })}>
+        <ActionButton tone="neutral" hotkey={legal.canCheck ? "C · Space" : "C"} onClick={() => onAct({ type: legal.canCheck ? "check" : "call" })}>
           {legal.canCheck ? "Check" : `Call ${formatHp(legal.callAmount)}`}
         </ActionButton>
         {legal.canRaise && (
-          <ActionButton tone="raise" hotkey="R" wide onClick={() => onAct({ type: "raise", to: size })}>
+          <ActionButton tone="raise" hotkey="R · Enter" wide onClick={() => onAct({ type: "raise", to: size })}>
             {allIn ? `All in ${formatHp(max)}` : `${raiseVerb} ${formatHp(size)}`}
           </ActionButton>
         )}

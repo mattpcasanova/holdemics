@@ -5,6 +5,8 @@ export interface Identity {
   username: string;
   title: string | null;
   avatar: string;
+  /** Supabase anonymous sign-in; never allowed into ranked. */
+  anonymous: boolean;
 }
 
 const jwksByUrl = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -25,9 +27,11 @@ function jwks(supabaseUrl: string) {
  */
 export async function identify(token: string, supabaseUrl: string, publishableKey: string): Promise<Identity | null> {
   let sub: string | undefined;
+  let anonymous = false;
   try {
     const { payload } = await jwtVerify(token, jwks(supabaseUrl), { issuer: `${supabaseUrl}/auth/v1` });
     sub = payload.sub;
+    anonymous = payload.is_anonymous === true;
   } catch {
     return null;
   }
@@ -39,5 +43,5 @@ export async function identify(token: string, supabaseUrl: string, publishableKe
   if (!res.ok) return null;
   const rows = (await res.json()) as { username: string; title: string | null; avatar: string }[];
   const username = rows[0]?.username;
-  return username ? { userId: sub, username, title: rows[0].title ?? null, avatar: rows[0].avatar ?? "initials" } : null;
+  return username ? { userId: sub, username, title: rows[0].title ?? null, avatar: rows[0].avatar ?? "initials", anonymous } : null;
 }
