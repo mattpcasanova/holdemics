@@ -64,6 +64,10 @@ export interface TableView {
   config: TableConfig;
   phase: TablePhase;
   seats: SeatView[];
+  /** The viewer's user id (hosts may watch without sitting). */
+  viewerId: string;
+  /** Display name of the host, when known (seated or connected). */
+  hostName: string | null;
   /** Redacted engine state; null in the lobby before the first deal. */
   game: GameState | null;
   /** Index of the viewer in `game.players`, or null when spectating. */

@@ -59,8 +59,8 @@ node scripts/table-client.mjs CODE   # Scripted second player for two-human tabl
 ## Game Rules (source of truth: src/lib/engine)
 
 - **Units**: engine amounts are integers where 1 HP = 10 units (`UNITS_PER_HP`), so the opening SB can be 0.5 HP. Always display via `formatHp()`.
-- **Modes**: Standard (8 players, 1 orbit/level, 20s clock), Turbo (8, ½ orbit/level, 12s), Heads-Up (2, 2 orbits = 4 hands/level, 15s).
-- **Levels are orbit-based**: a level lasts (players alive × orbits) hands, fixed when the level starts, so levels shorten as players bust (`levelHands()` in modes.ts; `handsLeftInLevel` in GameState).
+- **Modes**: Standard (8 players, 1 orbit/level, 20s clock), Turbo (8, ½ orbit/level, 12s), Heads-Up (2, 5 hands/level since an orbit is only two hands, 15s).
+- **Levels are orbit-based** (8-max) or hand-based (Heads-Up): a level lasts (players alive × orbits) hands, fixed when the level starts, so levels shorten as players bust (`levelHands()` in modes.ts; `handsLeftInLevel` in GameState).
 - **Blinds** (BB in HP, SB = half): 1, 2, 3, 5, 8, 12, 18, 25, 35, 50, 70, 100, …
 - Sim results (mixed bots): Standard ~33 hands, Turbo ~25, Heads-Up ~21. Orbit levels beat fixed 5-hand levels (38 hands) — slower early, faster late, tighter spread.
 - **Clock**: per-decision seconds + per-game time bank (`timeBankSeconds`). Bank drains only after the main clock expires; on full expiry the hero auto-checks or folds and is put in **sit-out** mode (every turn auto check/fold) until they click "I'm back". Practice clock can be disabled in Settings; ranked must always enforce it server-side.
@@ -82,6 +82,7 @@ node scripts/table-client.mjs CODE   # Scripted second player for two-human tabl
 
 - **Where**: `server/` is a separate Cloudflare Worker package (own `package.json`, `tsconfig`, `wrangler.jsonc`). One SQLite-backed Durable Object (`TableRoom`) per table; run locally with `cd server && npm run dev` (port 8787, no Cloudflare login needed). Deploy with `npm run deploy` once a Cloudflare account is linked.
 - **Imports the engine directly** via the `@/*` path alias pointing at `../src/*`; keep `src/lib/engine`, `src/lib/practice/{runout,timing,sounds,bots}` and `src/lib/realtime/*` free of browser-only code.
+- **Lobby**: the host (`config.hostId`, shown as "You're hosting" / "Hosted by …" via `TableView.hostName`) can add bots and start without taking a seat; `TableView.viewerId` identifies the viewer even when unseated.
 - **Flow**: `POST /api/tables` (Next) inserts a `tables` row and calls the Worker `POST /tables/:code/create` with `TABLE_SERVER_SECRET`. The page `/table/[code]` opens `ws://…/tables/:code/ws?token=<supabase access token>`; the Worker verifies the JWT against the project JWKS and reads the username from `profiles`, so names are never client-claimed.
 - **Views**: the room sends each socket a `TableView` with `redactGame()` applied (own hole cards only, all at showdown, no deck). During an all-in runout it sends `maskResult()` output plus `runout` timing, and the result after `runoutSchedule().doneAt`.
 - **Clocks and bots** run on a single Durable Object alarm (`state.due`); every transition persists to storage first. Clock expiry auto check/folds and sits the player out until they send `back`.

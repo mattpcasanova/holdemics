@@ -610,9 +610,15 @@ export class TableRoom extends DurableObject<Env> {
     const mode = MODES[s.config.mode];
     const yourTurn = full?.phase === "betting" && viewer !== null && full.toAct === viewer && !s.runout;
 
+    const hostSeat = s.seats.find((x) => x.userId === s.config.hostId);
+    const hostSocket = this.ctx.getWebSockets().find((ws) => (ws.deserializeAttachment() as Attachment | null)?.userId === s.config.hostId);
+    const hostName = hostSeat?.name ?? (hostSocket?.deserializeAttachment() as Attachment | null)?.username ?? null;
+
     return {
       config: s.config,
       phase: s.phase,
+      viewerId: who.userId,
+      hostName,
       seats: s.seats.map((seat, index) => ({
         index,
         userId: seat.userId,

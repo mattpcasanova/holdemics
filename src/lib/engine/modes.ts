@@ -57,7 +57,8 @@ export const MODES: Record<ModeId, ModeConfig> = {
     name: "Heads-Up",
     tagline: "1v1. Winner takes all.",
     seats: 2,
-    levelLength: { kind: "orbits", orbits: 2 },
+    // Heads-up orbits are only two hands, so levels are counted in hands instead.
+    levelLength: { kind: "hands", hands: 5 },
     decisionSeconds: 15,
     timeBankSeconds: 25,
     estimatedMinutes: "~10 min",

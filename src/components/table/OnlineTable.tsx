@@ -49,10 +49,10 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
   const hero = you ?? 0;
   const game = view.game;
   const seatedHumans = view.seats.filter((s) => s.userId).length;
-  const isHost = view.seats.some((s) => s.isHost && s.index === you);
+  const isHost = view.viewerId === view.config.hostId;
   const heroSeat = you !== null ? view.seats[you] : null;
   const ranked = !!view.config.ranked;
-  const myUserId = heroSeat?.userId ?? null;
+  const myUserId = view.viewerId;
 
   const copyLink = async () => {
     try {
@@ -301,7 +301,7 @@ function SeatList({ seats, you }: { seats: SeatView[]; you: number | null }) {
                 <Avatar name={s.name} size={20} />
                 <span className={`flex-1 truncate ${s.index === you ? "font-medium text-gold" : "text-text-primary"}`}>{s.name}</span>
                 <PlayerTitle id={s.title} size={8.5} className="max-w-[90px]" />
-                {s.isHost && <span className="text-[10px] text-text-tertiary">host</span>}
+                {s.isHost && <span className="rounded-full border border-gold/40 px-1.5 text-[9px] font-semibold uppercase tracking-wider text-gold">Host</span>}
                 {!s.connected && <span className="text-[10px] text-red-muted">away</span>}
               </>
             ) : (
@@ -345,7 +345,14 @@ function LobbyTable({
     <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
       <div>
         <div className="font-display text-[26px] font-semibold tracking-tight">Waiting for players</div>
-        <p className="mt-1 max-w-[48ch] text-[14px] text-text-secondary">
+        <div className="mt-1.5 flex justify-center">
+          {isHost ? (
+            <span className="rounded-full border border-gold/50 bg-gold/10 px-2.5 py-0.5 text-[11.5px] font-semibold text-gold">You&apos;re hosting</span>
+          ) : (
+            <span className="rounded-full border border-border px-2.5 py-0.5 text-[11.5px] text-text-secondary">Hosted by {view.hostName ?? "a friend"}</span>
+          )}
+        </div>
+        <p className="mt-2 max-w-[48ch] text-[14px] text-text-secondary">
           Share the code <span className="font-display font-semibold text-gold">{view.config.code}</span> or the page link. {seatedHumans} of {total} seats taken.
           {isHost && open > 0 ? " Add bots below, or start with just the players here." : ""}
         </p>
@@ -357,7 +364,11 @@ function LobbyTable({
               <>
                 <Avatar name={s.name} size={36} ring={s.index === you ? "gold" : "none"} />
                 <span className="max-w-full truncate text-[12px] font-medium">{s.name}</span>
-                <span className="text-[10px] text-text-tertiary">{s.isHost ? "Host" : s.connected ? "Ready" : "Away"}</span>
+                {s.isHost ? (
+                  <span className="rounded-full border border-gold/40 px-1.5 text-[9.5px] font-semibold uppercase tracking-wider text-gold">Host</span>
+                ) : (
+                  <span className="text-[10px] text-text-tertiary">{s.connected ? "Ready" : "Away"}</span>
+                )}
               </>
             ) : view.seats.slice(0, s.index).filter((x) => !x.userId).length < bots ? (
               <>
