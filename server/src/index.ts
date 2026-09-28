@@ -1,11 +1,14 @@
 import { identify } from "./auth";
+import { Queue } from "./queue";
 import { TableRoom } from "./table";
+import { MODES } from "@/lib/engine/modes";
 import type { CreateTableRequest } from "@/lib/realtime/protocol";
 
-export { TableRoom };
+export { Queue, TableRoom };
 
 export interface Env {
   TABLES: DurableObjectNamespace<TableRoom>;
+  QUEUES: DurableObjectNamespace<Queue>;
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
   ALLOWED_ORIGIN: string;
@@ -23,10 +26,36 @@ function json(body: unknown, status = 200) {
  *   POST /tables/:code/create   (app server only, bearer secret) — configure a new table
  *   GET  /tables/:code/ws?token=<supabase jwt>                   — player WebSocket
  *   GET  /tables/:code                                           — public summary (exists, phase, seats)
+ *   GET  /queue/:mode/ws?token=<supabase jwt>                    — ranked matchmaking WebSocket
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    const queue = url.pathname.match(/^\/queue\/([a-z]+)\/ws$/);
+    if (queue) {
+      const mode = queue[1];
+      if (!(mode in MODES)) return json({ error: "Bad mode" }, 400);
+      if (request.headers.get("Upgrade") !== "websocket") return json({ error: "Expected a WebSocket" }, 426);
+      const origin = request.headers.get("Origin");
+      if (origin && origin !== env.ALLOWED_ORIGIN) return json({ error: "Origin not allowed" }, 403);
+      const token = url.searchParams.get("token") ?? "";
+      const who = token ? await identify(token, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY) : null;
+      if (!who) return json({ error: "Sign in to play ranked" }, 401);
+      const rating = await fetch(`${env.SUPABASE_URL}/rest/v1/ratings?user_id=eq.${who.userId}&mode=eq.${mode}&select=rating,games`, {
+        headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json() as Promise<{ rating: number; games: number }[]>)
+        .then((rows) => rows[0])
+        .catch(() => undefined);
+      const forward = new Request(`${url.origin}/ws?mode=${mode}`, request);
+      forward.headers.set("X-User-Id", who.userId);
+      forward.headers.set("X-Username", who.username);
+      forward.headers.set("X-Rating", String(rating?.rating ?? 1500));
+      forward.headers.set("X-Games", String(rating?.games ?? 0));
+      return env.QUEUES.getByName(mode).fetch(forward);
+    }
+
     const match = url.pathname.match(/^\/tables\/([^/]+)(?:\/(create|ws))?$/);
     if (!match) return json({ error: "Not found" }, 404);
     const code = match[1].toUpperCase();

@@ -88,6 +88,14 @@ node scripts/table-client.mjs CODE   # Scripted second player for two-human tabl
 - **Actions** carry `hand` and `step` (server transition counter) and are dropped if stale.
 - **Env**: `NEXT_PUBLIC_TABLE_SERVER_WS`, `TABLE_SERVER_URL`, `TABLE_SERVER_SECRET` (Next); `server/.dev.vars` holds the Worker's copy of the secret locally.
 
+## Ranked Play
+
+- **Queue**: `Queue` Durable Object per mode (`/queue/:mode/ws`). The pool is the open sockets; a sweep every 3s (and on join) groups `seats` players whose ratings fall inside each other's windows (±100, +50 every 10s waiting, max ±600), creates a locked ranked table for them, and sends the code. No bots, no party queue.
+- **Ranked tables**: `TableConfig.ranked` with fixed `players`; only those users can connect, lobby controls are ignored, the game auto-starts when everyone is connected, and a 30s `startTimeout` alarm cancels the match (no rating change) if someone never shows.
+- **Results**: at game end `recordRanked()` computes pairwise Elo (`src/lib/rating.ts`, provisional K doubled during placement: 10 games 8-max, 20 heads-up) and calls the RPC `record_ranked_result(secret, code, mode, results)`. That SECURITY DEFINER function checks the secret against Vault (`table_server_secret`, must equal the Worker's `TABLE_SERVER_SECRET`), inserts `ranked_games` rows (idempotent per table+player) and updates `ratings`. The Worker holds no service-role key. The advisor warns that anon can execute this SECURITY DEFINER function: intentional, it's the secret check that guards it.
+- **Tiers** (`src/lib/tiers.ts`): Unranked during placement, then Fish → Calling Station → Nit → Reg → Grinder → Pro → Crusher → Shark by rating, and The Nuts for the top 50 in a mode (`mode_rank` RPC).
+- **Test**: `node scripts/table-client.mjs --as friend --queue headsup` and `--as matt --queue headsup --strategy shove` in two shells; `--noshow` tests cancellation.
+
 ## Rating
 
 Pairwise Elo (`src/lib/rating.ts`): each finish = win vs everyone below, loss vs everyone above. Pairwise K = 70/(n-1) for 8-max, 32 for heads-up; doubled for the first 20 games (provisional). Even 8-player lobby → +35/+25/+15/+5/−5/−15/−25/−35, varying with lobby strength. Separate rating per mode.
@@ -106,9 +114,10 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 ## Roadmap
 
 1. ~~Engine + bots + practice mode~~ (done)
+1b. ~~Ranked matchmaking (all modes; Heads-Up is the one that fills), rating history, tier ladder~~ (done)
 2. ~~Supabase auth, profiles, per-mode ratings~~ (done); friends list after private tables
 3. ~~Server-authoritative multiplayer — private friend tables, unrated~~ (done; see Table Server)
-4. Ranked matchmaking (rating window widens with wait time; launch Heads-Up ranked first since 8-max needs 8 concurrent players)
+4. ~~Ranked matchmaking~~ (done; 8-max queues exist but need 8 concurrent players)
 5. Cosmetics (avatars, card backs, chip sets) and achievements
 
 ## Known Issues / Gotchas

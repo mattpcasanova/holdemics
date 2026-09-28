@@ -12,9 +12,11 @@ interface ResultOverlayProps {
   onPlayAgain: () => void;
   /** Live table: no skipping ahead, and "play again" isn't offered. */
   online?: boolean;
+  /** Ranked: the real change once the server has written it; undefined while pending. */
+  ranked?: { change?: { before: number; after: number } };
 }
 
-export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPlayAgain, online = false }: ResultOverlayProps) {
+export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPlayAgain, online = false, ranked }: ResultOverlayProps) {
   const hero = game.players[heroIndex];
   const place = hero.place ?? 1;
   const n = game.players.length;
@@ -49,17 +51,37 @@ export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPl
         </p>
 
         <div className="mt-4 rounded-lg border border-border bg-surface-deep px-4 py-3 text-left">
-          <div className="flex items-baseline justify-between">
-            <span className="text-[12px] text-text-secondary">Rating change</span>
-            <span className="font-display text-[15px] font-semibold text-text-tertiary">Unrated</span>
-          </div>
-          <p className="mt-1 text-[11.5px] leading-snug text-text-tertiary">
-            In an even ranked lobby, {ordinal(place)} would be{" "}
-            <span className={delta > 0 ? "text-felt-light" : "text-red-muted"}>
-              {delta > 0 ? `+${delta}` : delta}
-            </span>
-            .
-          </p>
+          {ranked ? (
+            <div className="flex items-baseline justify-between">
+              <span className="text-[12px] text-text-secondary">Rating</span>
+              {ranked.change ? (
+                <span className="font-display text-[15px] font-semibold tabular-nums">
+                  <span className="text-text-tertiary">{ranked.change.before} → </span>
+                  {ranked.change.after}{" "}
+                  <span className={ranked.change.after >= ranked.change.before ? "text-felt-light" : "text-red-muted"}>
+                    ({ranked.change.after >= ranked.change.before ? "+" : ""}
+                    {ranked.change.after - ranked.change.before})
+                  </span>
+                </span>
+              ) : (
+                <span className="text-[13px] text-text-tertiary">{finished ? "Updating…" : "Set when the game ends"}</span>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[12px] text-text-secondary">Rating change</span>
+                <span className="font-display text-[15px] font-semibold text-text-tertiary">Unrated</span>
+              </div>
+              <p className="mt-1 text-[11.5px] leading-snug text-text-tertiary">
+                In an even ranked lobby, {ordinal(place)} would be{" "}
+                <span className={delta > 0 ? "text-felt-light" : "text-red-muted"}>
+                  {delta > 0 ? `+${delta}` : delta}
+                </span>
+                .
+              </p>
+            </>
+          )}
         </div>
 
         <div className="mt-5 flex flex-col gap-2">

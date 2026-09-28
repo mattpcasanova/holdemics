@@ -4,9 +4,15 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-01",
   "durable_objects": {
-    "bindings": [{ "name": "TABLES", "class_name": "TableRoom" }]
+    "bindings": [
+      { "name": "TABLES", "class_name": "TableRoom" },
+      { "name": "QUEUES", "class_name": "Queue" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TableRoom"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["TableRoom"] },
+    { "tag": "v2", "new_sqlite_classes": ["Queue"] }
+  ],
   "vars": {
     "SUPABASE_URL": "https://flfuvcxbvfviwatnwsnw.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_M8prsR7oy_yKiDW4QxR9-A_u8jsE_Sh",

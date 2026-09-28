@@ -48,6 +48,8 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
   const seatedHumans = view.seats.filter((s) => s.userId).length;
   const isHost = view.seats.some((s) => s.isHost && s.index === you);
   const heroSeat = you !== null ? view.seats[you] : null;
+  const ranked = !!view.config.ranked;
+  const myUserId = heroSeat?.userId ?? null;
 
   const copyLink = async () => {
     try {
@@ -81,7 +83,9 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
 
   const idleText =
     view.phase === "lobby"
-      ? "Waiting for the host to start"
+      ? ranked
+        ? "Waiting for everyone to connect"
+        : "Waiting for the host to start"
       : !game || game.handNumber === 0
         ? "Shuffling up"
         : view.runout
@@ -123,8 +127,9 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
                 {copied ? "Copied" : code}
               </button>
             </div>
-            <div className="truncate text-[11px] text-text-tertiary">
-              Private, unrated{status !== "open" ? " · reconnecting" : ""}
+            <div className={`truncate text-[11px] ${ranked ? "text-gold" : "text-text-tertiary"}`}>
+              {ranked ? "Ranked, rating on the line" : "Private, unrated"}
+              {status !== "open" ? " · reconnecting" : ""}
             </div>
           </div>
         </div>
@@ -155,7 +160,15 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
       <div className="flex min-h-0 flex-1">
         <main className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-2 sm:p-4">
           <div className="min-h-0 flex-1">
-            {game ? (
+            {view.cancelled ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                <div className="font-display text-[24px] font-semibold">Match called off</div>
+                <p className="max-w-[44ch] text-[14px] text-text-secondary">{view.cancelled}</p>
+                <Link href="/" className="rounded-lg bg-gold px-4 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110">
+                  Back to lobby
+                </Link>
+              </div>
+            ) : game ? (
               <PokerTable
                 game={game}
                 heroIndex={hero}
@@ -165,6 +178,13 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
                 heroSittingOut={!!heroSeat?.sittingOut}
                 botLabel={`${BOT_LEVELS[view.config.botLevel].name} bot`}
               />
+            ) : ranked ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                <div className="font-display text-[24px] font-semibold">Match found</div>
+                <p className="text-[14px] text-text-secondary">
+                  {view.seats.filter((s) => !s.connected).length ? "Waiting for your opponent to connect" : "Dealing"}
+                </p>
+              </div>
             ) : (
               <LobbyTable view={view} you={you} isHost={isHost} onSit={sit} onStand={stand} onStart={start} seatedHumans={seatedHumans} />
             )}
@@ -200,6 +220,7 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
               heroIndex={hero}
               finished={view.phase === "finished"}
               online
+              ranked={ranked ? { change: myUserId ? view.ratingChanges?.[myUserId] : undefined } : undefined}
               onWatch={() => setDismissedResult(true)}
               onSkip={() => setDismissedResult(true)}
               onPlayAgain={() => setDismissedResult(true)}

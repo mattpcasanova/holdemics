@@ -1,3 +1,5 @@
+import type { ModeId } from "./engine/modes";
+
 /**
  * Placement rating via pairwise Elo: each finish is scored as a win against
  * everyone placed below and a loss to everyone placed above. With equal
@@ -16,17 +18,25 @@ export interface RatedEntry {
 /** Total K spread across all opponents. Pairwise K = kTotal / (n - 1). */
 const K_TOTAL_MULTI = 70;
 const K_TOTAL_HEADS_UP = 32;
-const PROVISIONAL_GAMES = 20;
 const PROVISIONAL_MULTIPLIER = 2;
+
+/**
+ * Placement games before a rating settles. An 8-player finish is seven
+ * pairwise results at once, so multi-player modes need fewer games.
+ */
+export function placementGames(mode: ModeId): number {
+  return mode === "headsup" ? 20 : 10;
+}
 
 export function expectedScore(rating: number, opponent: number): number {
   return 1 / (1 + 10 ** ((opponent - rating) / 400));
 }
 
-export function ratingChanges(entries: RatedEntry[]): Record<string, number> {
+export function ratingChanges(entries: RatedEntry[], mode: ModeId = entries.length === 2 ? "headsup" : "standard"): Record<string, number> {
   const n = entries.length;
   if (n < 2) return Object.fromEntries(entries.map((e) => [e.id, 0]));
   const kPair = (n === 2 ? K_TOTAL_HEADS_UP : K_TOTAL_MULTI) / (n - 1);
+  const provisionalBelow = placementGames(mode);
 
   const out: Record<string, number> = {};
   for (const me of entries) {
@@ -36,7 +46,7 @@ export function ratingChanges(entries: RatedEntry[]): Record<string, number> {
       const actual = me.place < them.place ? 1 : me.place > them.place ? 0 : 0.5;
       delta += kPair * (actual - expectedScore(me.rating, them.rating));
     }
-    if (me.gamesPlayed < PROVISIONAL_GAMES) delta *= PROVISIONAL_MULTIPLIER;
+    if (me.gamesPlayed < provisionalBelow) delta *= PROVISIONAL_MULTIPLIER;
     out[me.id] = Math.round(delta);
   }
   return out;
@@ -54,7 +64,7 @@ export function evenLobbyPayouts(players: number): number[] {
     id: String(i),
     rating: 1500,
     place: i + 1,
-    gamesPlayed: PROVISIONAL_GAMES,
+    gamesPlayed: 999,
   }));
   const deltas = ratingChanges(entries);
   return entries.map((e) => deltas[e.id]);

@@ -15,9 +15,9 @@ export default async function LobbyPage() {
       <MobileTopBar profile={account?.profile ?? null} />
       <div className="mx-auto grid w-full max-w-[1240px] grid-cols-[1fr_300px] gap-6 p-4 sm:p-6 max-xl:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-8">
-          <LobbyHero />
+          <LobbyHero signedIn={!!account} serverWs={process.env.NEXT_PUBLIC_TABLE_SERVER_WS ?? null} />
           <PracticePicker />
-          <RecentGames games={account?.recentPractice ?? []} signedIn={!!account} now={account?.loadedAt ?? 0} />
+          <RecentGames games={account?.recent ?? []} signedIn={!!account} now={account?.loadedAt ?? 0} />
         </div>
         <aside className="flex flex-col gap-4">
           <ProfileCard account={account} />

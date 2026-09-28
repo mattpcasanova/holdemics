@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { PracticeGame } from "@/lib/account";
+import type { GameRecord } from "@/lib/account";
 import { BOT_LEVELS } from "@/lib/engine/bots";
 import { MODES } from "@/lib/engine/modes";
 import { ordinal } from "@/lib/rating";
@@ -14,7 +14,7 @@ function timeAgo(iso: string, now: number): string {
   return days === 1 ? "yesterday" : `${days}d ago`;
 }
 
-export function RecentGames({ games, signedIn, now }: { games: PracticeGame[]; signedIn: boolean; now: number }) {
+export function RecentGames({ games, signedIn, now }: { games: GameRecord[]; signedIn: boolean; now: number }) {
   return (
     <section aria-labelledby="recent-heading">
       <h2 id="recent-heading" className="mb-3 font-display text-[20px] font-semibold tracking-tight">
@@ -29,14 +29,15 @@ export function RecentGames({ games, signedIn, now }: { games: PracticeGame[]; s
         </div>
       ) : games.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-5 text-[13px] text-text-secondary">
-          Finish a practice game and it will show up here.
+          Finish a game and it will show up here.
         </div>
       ) : (
         <ol className="overflow-hidden rounded-xl border border-border bg-surface-primary">
           {games.map((g, i) => {
             const top = g.place <= Math.floor(g.players / 2);
+            const delta = g.kind === "ranked" ? g.rating_after - g.rating_before : null;
             return (
-              <li key={g.id} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-border" : ""}`}>
+              <li key={`${g.kind}-${g.id}`} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-border" : ""}`}>
                 <span
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-display text-[13px] font-semibold ${
                     g.place === 1 ? "bg-gold text-surface-primary" : top ? "bg-gold/15 text-gold" : "bg-red/15 text-red-muted"
@@ -46,14 +47,23 @@ export function RecentGames({ games, signedIn, now }: { games: PracticeGame[]; s
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-[13.5px] font-medium">
-                    {MODES[g.mode].name} vs {BOT_LEVELS[g.bot_level].name} {g.players === 2 ? "bot" : "bots"}
+                    {g.kind === "ranked"
+                      ? `Ranked ${MODES[g.mode].name}`
+                      : `${MODES[g.mode].name} vs ${BOT_LEVELS[g.bot_level].name} ${g.players === 2 ? "bot" : "bots"}`}
                   </div>
                   <div className="text-[12px] text-text-tertiary">
                     {g.players} players, {g.hands} {g.hands === 1 ? "hand" : "hands"}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[12px] text-text-tertiary">Practice</div>
+                  {delta === null ? (
+                    <div className="text-[12px] text-text-tertiary">Practice</div>
+                  ) : (
+                    <div className={`font-display text-[15px] font-semibold tabular-nums ${delta >= 0 ? "text-felt-light" : "text-red-muted"}`}>
+                      {delta >= 0 ? "+" : ""}
+                      {delta}
+                    </div>
+                  )}
                   <div className="text-[12px] text-text-tertiary">{timeAgo(g.played_at, now)}</div>
                 </div>
               </li>

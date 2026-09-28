@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { type ModeId, MODES, STARTING_HP, describeLevelLength } from "@/lib/engine/modes";
 import { evenLobbyPayouts, ordinal } from "@/lib/rating";
+import { RankedButton } from "./RankedButton";
 
 const MODE_ORDER: ModeId[] = ["standard", "turbo", "headsup"];
 
@@ -62,7 +63,7 @@ function MiniTable({ seats }: { seats: number }) {
   );
 }
 
-export function LobbyHero() {
+export function LobbyHero({ signedIn, serverWs }: { signedIn: boolean; serverWs: string | null }) {
   const [modeId, setModeId] = useState<ModeId>("standard");
   const mode = MODES[modeId];
 
@@ -114,19 +115,13 @@ export function LobbyHero() {
           </dl>
 
           <div className="mt-7 flex flex-wrap items-center gap-3">
+            <RankedButton mode={modeId} signedIn={signedIn} serverWs={serverWs} />
             <Link
               href={`/practice?mode=${modeId}&bots=medium`}
-              className="whitespace-nowrap rounded-lg bg-gold px-5 py-3 font-display text-[15px] font-semibold text-surface-primary transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              className="whitespace-nowrap rounded-lg border border-border px-4 py-3 text-[14px] text-text-secondary transition hover:bg-white/5 hover:text-text-primary"
             >
-              Play {mode.name} vs bots
+              Practice vs bots
             </Link>
-            <button
-              disabled
-              className="cursor-not-allowed whitespace-nowrap rounded-lg border border-border px-4 py-3 text-[14px] text-text-tertiary"
-              title="Ranked matchmaking arrives with accounts"
-            >
-              Ranked opens soon
-            </button>
           </div>
         </div>
 

@@ -8,6 +8,13 @@ import type { ModeId } from "../engine/modes";
  * it sends is produced by `redactView` in ./view.ts.
  */
 
+export interface RankedPlayer {
+  userId: string;
+  name: string;
+  rating: number;
+  games: number;
+}
+
 export interface TableConfig {
   code: string;
   mode: ModeId;
@@ -15,6 +22,9 @@ export interface TableConfig {
   /** Bots used to fill empty seats when the host starts the game. */
   botLevel: BotLevel;
   createdAt: number;
+  /** Ranked tables are created by the matchmaker with fixed players and no bots. */
+  ranked?: boolean;
+  players?: RankedPlayer[];
 }
 
 export interface SeatView {
@@ -60,6 +70,10 @@ export interface TableView {
   history: { hand: number; events: LogEvent[] }[];
   /** Server transition counter; echoed back with actions so stale ones are ignored. */
   step: number;
+  /** Ranked only, once the game has ended and ratings are written; keyed by user id. */
+  ratingChanges?: Record<string, { before: number; after: number }>;
+  /** Set when a ranked match was called off before it started. */
+  cancelled?: string;
 }
 
 export type ClientMessage =
@@ -79,3 +93,10 @@ export type ServerMessage =
 export interface CreateTableRequest {
   config: TableConfig;
 }
+
+export type QueueClientMessage = { type: "leave" } | { type: "ping" };
+
+export type QueueServerMessage =
+  | { type: "queued"; waiting: number; since: number; window: number }
+  | { type: "matched"; code: string }
+  | { type: "pong" };

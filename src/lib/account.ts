@@ -13,7 +13,26 @@ export interface Rating {
   rating: number;
   peak: number;
   games: number;
+  /** Leaderboard position in the mode, once placed. */
+  rank: number | null;
 }
+
+export interface RankedGame {
+  id: number;
+  table_code: string;
+  mode: ModeId;
+  place: number;
+  players: number;
+  hands: number;
+  rating_before: number;
+  rating_after: number;
+  played_at: string;
+}
+
+/** Practice and ranked results merged for the history list. */
+export type GameRecord =
+  | ({ kind: "practice" } & PracticeGame)
+  | ({ kind: "ranked" } & RankedGame);
 
 export interface PracticeGame {
   id: number;
@@ -29,6 +48,7 @@ export interface Account {
   profile: Profile;
   ratings: Rating[];
   recentPractice: PracticeGame[];
+  recent: GameRecord[];
   /** When this snapshot was loaded; used for "2h ago" labels. */
   loadedAt: number;
 }
@@ -38,7 +58,7 @@ export async function getAccount(): Promise<Account | null> {
   const viewer = await getViewer();
   if (!viewer) return null;
   const supabase = await createClient();
-  const [profile, ratings, practice] = await Promise.all([
+  const [profile, ratings, practice, ranked] = await Promise.all([
     supabase.from("profiles").select("id, username, avatar").eq("id", viewer.id).maybeSingle(),
     supabase.from("ratings").select("mode, rating, peak, games").eq("user_id", viewer.id),
     supabase
@@ -47,12 +67,38 @@ export async function getAccount(): Promise<Account | null> {
       .eq("user_id", viewer.id)
       .order("played_at", { ascending: false })
       .limit(8),
+    supabase
+      .from("ranked_games")
+      .select("id, table_code, mode, place, players, hands, rating_before, rating_after, played_at")
+      .eq("user_id", viewer.id)
+      .order("played_at", { ascending: false })
+      .limit(8),
   ]);
   if (!profile.data) return null;
+
+  const ratingRows = (ratings.data ?? []) as Omit<Rating, "rank">[];
+  const ranks = await Promise.all(
+    ratingRows.map(async (r) => {
+      if (r.games === 0) return null;
+      const { data } = await supabase.rpc("mode_rank", { p_mode: r.mode, p_user: viewer.id });
+      return typeof data === "number" ? data : null;
+    }),
+  );
+
+  const recentPractice = (practice.data ?? []) as PracticeGame[];
+  const recentRanked = (ranked.data ?? []) as RankedGame[];
+  const recent: GameRecord[] = [
+    ...recentPractice.map((g) => ({ kind: "practice" as const, ...g })),
+    ...recentRanked.map((g) => ({ kind: "ranked" as const, ...g })),
+  ]
+    .sort((a, b) => Date.parse(b.played_at) - Date.parse(a.played_at))
+    .slice(0, 8);
+
   return {
     profile: profile.data as Profile,
-    ratings: (ratings.data ?? []) as Rating[],
-    recentPractice: (practice.data ?? []) as PracticeGame[],
+    ratings: ratingRows.map((r, i) => ({ ...r, rank: ranks[i] })),
+    recentPractice,
+    recent,
     loadedAt: Date.now(),
   };
 }

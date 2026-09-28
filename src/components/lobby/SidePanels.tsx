@@ -1,6 +1,8 @@
 import { Avatar } from "@/components/ui/Avatar";
 import type { Account } from "@/lib/account";
 import type { ModeId } from "@/lib/engine/modes";
+import { placementGames } from "@/lib/rating";
+import { UNRANKED, nextTier, tierFor } from "@/lib/tiers";
 
 const RATED_MODES: { id: ModeId; label: string }[] = [
   { id: "standard", label: "Standard" },
@@ -8,8 +10,6 @@ const RATED_MODES: { id: ModeId; label: string }[] = [
   { id: "headsup", label: "Heads-Up" },
 ];
 
-/** Placement games before a rating settles. Multi-player games carry more information per game. */
-const PLACEMENT_GAMES: Record<ModeId, number> = { standard: 10, turbo: 10, headsup: 20 };
 
 export function ProfileCard({ account }: { account: Account | null }) {
   const name = account?.profile.username ?? "Guest";
@@ -28,14 +28,26 @@ export function ProfileCard({ account }: { account: Account | null }) {
       <div className="mt-4 grid grid-cols-3 gap-2 text-center">
         {RATED_MODES.map((m) => {
           const r = byMode.get(m.id);
-          const needed = PLACEMENT_GAMES[m.id];
+          const needed = placementGames(m.id);
           const placed = r ? Math.min(r.games, needed) : 0;
+          const tier = r ? tierFor(m.id, r.rating, r.games, r.rank) : UNRANKED;
+          const next = r ? nextTier(tier, r.rating) : null;
           return (
             <div key={m.id} className="rounded-lg bg-surface-deep px-2 py-2">
               <div className={`font-display text-[17px] font-semibold tabular-nums ${r ? "text-text-primary" : "text-text-tertiary"}`}>
                 {r ? r.rating : "—"}
               </div>
               <div className="text-[11px] text-text-tertiary">{m.label}</div>
+              {r && tier !== UNRANKED && (
+                <div
+                  className="mt-1 truncate text-[11px] font-semibold"
+                  style={{ color: tier.color }}
+                  title={next ? `${next.pointsAway} to ${next.tier.name}` : tier.blurb}
+                >
+                  {tier.name}
+                  {r.rank !== null && r.rank <= 50 ? ` · #${r.rank}` : ""}
+                </div>
+              )}
               {r && placed < needed && (
                 <div
                   className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-border"
@@ -53,7 +65,7 @@ export function ProfileCard({ account }: { account: Account | null }) {
       </div>
       <p className="mt-3 text-[12px] leading-snug text-text-tertiary">
         {account
-          ? "Everyone starts at 1500. Ratings move faster during placement: 10 games in 8-max modes, 20 in Heads-Up."
+          ? "Everyone starts at 1500 and is Unranked through placement: 10 games in 8-max modes, 20 in Heads-Up. Then you earn a tier, from Fish up to The Nuts."
           : "Each mode keeps its own rating, and it settles after a few placement games."}
       </p>
     </section>

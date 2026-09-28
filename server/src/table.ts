@@ -23,6 +23,7 @@ import type {
   TableView,
 } from "@/lib/realtime/protocol";
 import { redactGame } from "@/lib/realtime/view";
+import { ratingChanges } from "@/lib/rating";
 import type { Env } from "./index";
 
 /**
@@ -49,7 +50,9 @@ type Due =
   | { kind: "sitout"; at: number }
   | { kind: "handEnd"; at: number }
   | { kind: "runout"; at: number }
-  | { kind: "deal"; at: number };
+  | { kind: "deal"; at: number }
+  /** Ranked: everyone must connect before this, or the match is called off. */
+  | { kind: "startTimeout"; at: number };
 
 interface TableState {
   config: TableConfig;
@@ -63,7 +66,11 @@ interface TableState {
   /** Increments on every game transition; clients echo it so stale actions are ignored. */
   step: number;
   due: Due | null;
+  ratingChanges?: Record<string, { before: number; after: number }>;
+  cancelled?: string;
 }
+
+const RANKED_START_TIMEOUT_MS = 30_000;
 
 interface Attachment {
   userId: string;
@@ -93,16 +100,21 @@ export class TableRoom extends DurableObject<Env> {
       const { config } = (await request.json()) as CreateTableRequest;
       if (this.state) return Response.json({ error: "Table already exists" }, { status: 409 });
       const seats = MODES[config.mode].seats;
+      const ranked = !!config.ranked && !!config.players;
+      if (ranked && config.players!.length !== seats) return Response.json({ error: "Ranked tables must be full" }, { status: 400 });
       this.state = {
         config,
         phase: "lobby",
-        seats: Array.from({ length: seats }, () => ({ userId: null, name: "", isBot: false, sittingOut: false, bankMs: 0 })),
+        seats: Array.from({ length: seats }, (_, i) => {
+          const p = ranked ? config.players![i] : null;
+          return { userId: p?.userId ?? null, name: p?.name ?? "", isBot: false, sittingOut: false, bankMs: 0 };
+        }),
         game: null,
         turnStartedAt: null,
         runout: null,
         history: [],
         step: 0,
-        due: null,
+        due: ranked ? { kind: "startTimeout", at: Date.now() + RANKED_START_TIMEOUT_MS } : null,
       };
       await this.save();
       return Response.json({ ok: true });
@@ -126,10 +138,19 @@ export class TableRoom extends DurableObject<Env> {
         userId: request.headers.get("X-User-Id")!,
         username: request.headers.get("X-Username")!,
       };
+      // Ranked tables are for the matched players only.
+      if (this.state.config.ranked && !this.state.seats.some((s) => s.userId === attachment.userId)) {
+        return Response.json({ error: "This ranked table isn't yours" }, { status: 403 });
+      }
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
       this.ctx.acceptWebSocket(server);
       server.serializeAttachment(attachment);
+      // Ranked: the game starts itself once every matched player has connected.
+      if (this.state.config.ranked && this.state.phase === "lobby" && this.state.seats.every((s) => s.userId && this.isConnected(s.userId))) {
+        this.startGame();
+        await this.save();
+      }
       // A returning player keeps their seat; just refresh everyone's view.
       this.broadcast();
       return new Response(null, { status: 101, webSocket: client });
@@ -156,12 +177,15 @@ export class TableRoom extends DurableObject<Env> {
         this.send(ws, { type: "pong" });
         return;
       case "sit":
+        if (this.state.config.ranked) return;
         this.sit(who);
         break;
       case "stand":
+        if (this.state.config.ranked) return;
         this.stand(who);
         break;
       case "start":
+        if (this.state.config.ranked) return;
         if (who.userId !== this.state.config.hostId) return this.send(ws, { type: "error", message: "Only the host can start the game." });
         this.startGame();
         break;
@@ -190,7 +214,7 @@ export class TableRoom extends DurableObject<Env> {
   async webSocketClose(ws: WebSocket) {
     ws.close();
     // In the lobby a player who leaves frees their seat; mid-game the seat is kept.
-    if (this.state?.phase === "lobby") {
+    if (this.state?.phase === "lobby" && !this.state.config.ranked) {
       const who = ws.deserializeAttachment() as Attachment | null;
       if (who && !this.isConnected(who.userId, ws)) this.stand(who);
     }
@@ -206,9 +230,21 @@ export class TableRoom extends DurableObject<Env> {
 
   async alarm() {
     const s = this.state;
-    if (!s?.due || !s.game) return;
+    if (!s?.due) return;
     const due = s.due;
     s.due = null;
+
+    if (due.kind === "startTimeout") {
+      if (s.phase === "lobby") {
+        s.phase = "finished";
+        s.cancelled = "A player didn't show up, so the match was called off. No rating change.";
+        await this.save();
+        this.broadcast();
+      }
+      return;
+    }
+
+    if (!s.game) return;
     const g = s.game;
 
     switch (due.kind) {
@@ -243,7 +279,10 @@ export class TableRoom extends DurableObject<Env> {
         }
         break;
     }
+    await this.pendingRanked;
   }
+
+  private pendingRanked: Promise<void> | null = null;
 
   // ─── Lobby ───────────────────────────────────────────────
 
@@ -269,7 +308,7 @@ export class TableRoom extends DurableObject<Env> {
     const humans = s.seats.filter((x) => x.userId);
     if (humans.length === 0) return;
 
-    // Fill the empty seats with bots so the table is full.
+    // Fill the empty seats with bots so the table is full (never on ranked tables).
     const bots = botSeats(s.seats.length - humans.length, s.config.botLevel);
     let b = 0;
     for (const seat of s.seats) {
@@ -338,6 +377,7 @@ export class TableRoom extends DurableObject<Env> {
     if (g.phase === "finished") {
       s.phase = "finished";
       s.due = null;
+      if (s.config.ranked) this.pendingRanked = this.recordRanked(g);
       return;
     }
     s.due = { kind: "handEnd", at: Date.now() + (g.result?.showdown ? PACE.showdownEnd : PACE.handEnd) };
@@ -355,6 +395,56 @@ export class TableRoom extends DurableObject<Env> {
     const s = this.state!;
     const rest = s.history.length && s.history[s.history.length - 1].hand === g.handNumber ? s.history.slice(0, -1) : s.history;
     s.history = [...rest, { hand: g.handNumber, events: g.log }].slice(-HISTORY_LIMIT);
+  }
+
+  // ─── Ranked results ──────────────────────────────────────
+
+  /**
+   * Pairwise Elo over the finishing places, written with the service role:
+   * new ratings (and peak/games) plus one ranked_games row per player.
+   */
+  private async recordRanked(g: GameState) {
+    const s = this.state!;
+    const players = s.config.players ?? [];
+    const entries = players.map((p) => {
+      const seat = s.seats.findIndex((x) => x.userId === p.userId);
+      return { id: p.userId, rating: p.rating, gamesPlayed: p.games, place: g.players[seat]?.place ?? players.length };
+    });
+    const deltas = ratingChanges(entries, s.config.mode);
+    const changes: Record<string, { before: number; after: number }> = {};
+    for (const e of entries) changes[e.id] = { before: e.rating, after: e.rating + (deltas[e.id] ?? 0) };
+
+    // Written through a guarded database function, so the server needs no privileged key.
+    try {
+      const res = await fetch(`${this.env.SUPABASE_URL}/rest/v1/rpc/record_ranked_result`, {
+        method: "POST",
+        headers: {
+          apikey: this.env.SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${this.env.SUPABASE_PUBLISHABLE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          p_secret: this.env.TABLE_SERVER_SECRET,
+          p_code: s.config.code,
+          p_mode: s.config.mode,
+          p_results: entries.map((e) => ({
+            user_id: e.id,
+            place: e.place,
+            players: entries.length,
+            hands: g.handNumber,
+            rating_before: e.rating,
+            rating_after: changes[e.id].after,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      s.ratingChanges = changes;
+    } catch (err) {
+      console.error("ranked write failed", err);
+      s.cancelled = "Ratings couldn't be saved for this game. It won't count.";
+    }
+    await this.save();
+    this.broadcast();
   }
 
   // ─── Views and I/O ───────────────────────────────────────
@@ -396,6 +486,8 @@ export class TableRoom extends DurableObject<Env> {
       runout: s.runout,
       history: s.history,
       step: s.step,
+      ratingChanges: s.ratingChanges,
+      cancelled: s.cancelled,
     };
   }
 
