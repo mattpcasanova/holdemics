@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { type PlayerNote, type PlayerTag, notesStore } from "@/lib/notes";
 import { type Settings, DEFAULT_SETTINGS, settingsStore } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/client";
+import { unlocksStore } from "@/lib/unlocks";
 
 const SAVE_DELAY_MS = 800;
 
@@ -15,18 +16,24 @@ const SAVE_DELAY_MS = 800;
  */
 export function AccountSync({ userId }: { userId: string | null }) {
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      unlocksStore.set({ userId: null, owned: [], title: null, loaded: false });
+      return;
+    }
     const supabase = createClient();
     let ready = false;
     let cancelled = false;
     let synced: Record<string, PlayerNote> = {};
 
     const load = async () => {
-      const [settingsRes, notesRes] = await Promise.all([
+      const [settingsRes, notesRes, cosmeticsRes, profileRes] = await Promise.all([
         supabase.from("user_settings").select("settings").eq("user_id", userId).maybeSingle(),
         supabase.from("player_notes").select("subject, tag, note, updated_at"),
+        supabase.from("player_cosmetics").select("kind, item_id").eq("user_id", userId),
+        supabase.from("profiles").select("title").eq("id", userId).maybeSingle(),
       ]);
       if (cancelled) return;
+      unlocksStore.set({ userId, owned: cosmeticsRes.data ?? [], title: profileRes.data?.title ?? null, loaded: true });
 
       const remoteSettings = (settingsRes.data?.settings ?? {}) as Partial<Settings>;
       if (Object.keys(remoteSettings).length) {

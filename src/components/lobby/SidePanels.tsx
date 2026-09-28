@@ -1,4 +1,5 @@
 import { Avatar } from "@/components/ui/Avatar";
+import { PlayerTitle } from "@/components/ui/PlayerTitle";
 import type { Account } from "@/lib/account";
 import type { ModeId } from "@/lib/engine/modes";
 import { placementGames } from "@/lib/rating";
@@ -22,6 +23,7 @@ export function ProfileCard({ account }: { account: Account | null }) {
           <h2 id="profile-heading" className="truncate text-[14px] font-medium">
             {name}
           </h2>
+          <PlayerTitle id={account?.profile.title} />
           <div className="text-[12px] text-text-tertiary">
             {account ? `${account.ratings.reduce((n, r) => n + r.games, 0)} ranked games` : "Unrated"}
           </div>

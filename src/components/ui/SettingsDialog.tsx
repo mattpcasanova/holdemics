@@ -6,9 +6,13 @@ import { ChipIcon } from "@/components/table/ChipStack";
 import { PlayingCard } from "@/components/table/PlayingCard";
 import { play } from "@/lib/audio";
 import { SpeakerIcon } from "./SoundToggle";
-import { CARD_BACKS, CHIP_SETS } from "@/lib/cosmetics";
+import { PlayerTitle } from "./PlayerTitle";
+import { ACHIEVEMENT_BY_ID } from "@/lib/achievements";
+import { type TableSkin, CARD_BACKS, CHIP_SETS, RARITY, TABLE_SKINS, TITLES, ownedCosmetics } from "@/lib/cosmetics";
 import type { Card } from "@/lib/engine/cards";
 import { type DeckStyle, settingsStore, useSettings } from "@/lib/settings";
+import { createClient } from "@/lib/supabase/client";
+import { unlocksStore, useUnlocks } from "@/lib/unlocks";
 
 const SAMPLE: Card[] = [
   { rank: 14, suit: "s" },
@@ -62,10 +66,50 @@ function Option({
   );
 }
 
+function unlockHint(achievementId: string | undefined): string {
+  const a = achievementId ? ACHIEVEMENT_BY_ID.get(achievementId) : undefined;
+  return a ? `Unlock: ${a.name}` : "";
+}
+
+function Locked({ hint }: { hint: string }) {
+  return (
+    <span className="mt-1 block text-center text-[10.5px] text-text-tertiary" title={hint}>
+      🔒 {hint.replace("Unlock: ", "")}
+    </span>
+  );
+}
+
+function TablePreview({ skin }: { skin: TableSkin }) {
+  return (
+    <div className="mx-auto h-11 w-[84px] rounded-[50%] p-[4px]" style={{ background: `linear-gradient(180deg, ${skin.rail[0]}, ${skin.rail[1]})` }}>
+      <div
+        className="h-full w-full rounded-[50%]"
+        style={{
+          background: `radial-gradient(ellipse at 50% 40%, ${skin.felt[0]} 0%, ${skin.felt[1]} 35%, ${skin.felt[2]} 72%, ${skin.felt[3]} 100%)`,
+          boxShadow: `inset 0 0 0 1px ${skin.inlay}`,
+        }}
+      />
+    </div>
+  );
+}
+
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useSettings();
+  const unlocks = useUnlocks();
+  const userId = unlocks.userId;
+  const owned = ownedCosmetics(unlocks.owned);
+  const ownsBack = new Set(owned.cardBacks.map((b) => b.id));
+  const ownsTable = new Set(owned.tables.map((t) => t.id));
   const muted = !settings.sound || settings.volume === 0;
   const panel = useRef<HTMLDivElement>(null);
+
+  const chooseTitle = async (id: string | null) => {
+    const prev = unlocks.title;
+    unlocksStore.set({ title: id });
+    if (!userId) return;
+    const { error } = await createClient().from("profiles").update({ title: id }).eq("id", userId);
+    if (error) unlocksStore.set({ title: prev });
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -132,19 +176,81 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           </h3>
           <p className="mb-3 text-[12.5px] text-text-secondary">What opponents&apos; cards look like on your screen.</p>
           <div role="radiogroup" aria-labelledby="back-heading" className="grid grid-cols-4 gap-2.5 max-sm:grid-cols-2">
-            {Object.values(CARD_BACKS).map((b) => (
-              <Option
-                key={b.id}
-                label={b.name}
-                selected={settings.cardBack === b.id}
-                onSelect={() => settingsStore.set({ cardBack: b.id })}
-              >
-                <div className="mb-2 flex justify-center">
-                  <PlayingCard faceDown size="md" backSkin={b.id} />
-                </div>
-                <div className="text-center text-[12.5px] font-medium">{b.name}</div>
-              </Option>
-            ))}
+            {Object.values(CARD_BACKS).map((b) => {
+              const locked = !ownsBack.has(b.id);
+              return (
+                <Option
+                  key={b.id}
+                  label={locked ? `${b.name} (locked)` : b.name}
+                  selected={settings.cardBack === b.id}
+                  onSelect={() => !locked && settingsStore.set({ cardBack: b.id })}
+                >
+                  <div className={`mb-2 flex justify-center ${locked ? "opacity-40 grayscale" : ""}`}>
+                    <PlayingCard faceDown size="md" backSkin={b.id} />
+                  </div>
+                  <div className="text-center text-[12.5px] font-medium">{b.name}</div>
+                  {b.unlock && <div className="text-center text-[10px] font-semibold uppercase tracking-wider" style={{ color: RARITY[b.rarity].color }}>{RARITY[b.rarity].label}</div>}
+                  {locked && <Locked hint={unlockHint(b.unlock)} />}
+                </Option>
+              );
+            })}
+          </div>
+        </section>
+
+        <section aria-labelledby="table-heading" className="mb-6">
+          <h3 id="table-heading" className="font-display text-[15px] font-semibold">
+            Table
+          </h3>
+          <p className="mb-3 text-[12.5px] text-text-secondary">The felt and rail on every table you sit at.</p>
+          <div role="radiogroup" aria-labelledby="table-heading" className="grid grid-cols-4 gap-2.5 max-sm:grid-cols-2">
+            {Object.values(TABLE_SKINS).map((t) => {
+              const locked = !ownsTable.has(t.id);
+              return (
+                <Option
+                  key={t.id}
+                  label={locked ? `${t.name} (locked)` : t.name}
+                  selected={settings.tableSkin === t.id}
+                  onSelect={() => !locked && settingsStore.set({ tableSkin: t.id })}
+                >
+                  <div className={`mb-2 ${locked ? "opacity-40 grayscale" : ""}`}>
+                    <TablePreview skin={t} />
+                  </div>
+                  <div className="text-center text-[12.5px] font-medium">{t.name}</div>
+                  {t.unlock && <div className="text-center text-[10px] font-semibold uppercase tracking-wider" style={{ color: RARITY[t.rarity].color }}>{RARITY[t.rarity].label}</div>}
+                  {locked && <Locked hint={unlockHint(t.unlock)} />}
+                </Option>
+              );
+            })}
+          </div>
+        </section>
+
+        <section aria-labelledby="title-heading" className="mb-6">
+          <h3 id="title-heading" className="font-display text-[15px] font-semibold">
+            Title
+          </h3>
+          <p className="mb-3 text-[12.5px] text-text-secondary">
+            {userId ? "Shown under your name at the table and on the leaderboard. Titles come from achievements." : "Sign in to earn and wear titles."}
+          </p>
+          <div role="radiogroup" aria-labelledby="title-heading" className="grid grid-cols-3 gap-2.5 max-sm:grid-cols-2">
+            <Option label="No title" selected={unlocks.title === null} onSelect={() => chooseTitle(null)}>
+              <div className="text-center text-[12.5px] text-text-tertiary">No title</div>
+            </Option>
+            {Object.values(TITLES).map((t) => {
+              const locked = !owned.titles.some((o) => o.id === t.id);
+              return (
+                <Option
+                  key={t.id}
+                  label={locked ? `${t.text} (locked)` : t.text}
+                  selected={unlocks.title === t.id}
+                  onSelect={() => !locked && chooseTitle(t.id)}
+                >
+                  <div className={`text-center ${locked ? "opacity-40 grayscale" : ""}`}>
+                    <PlayerTitle id={t.id} size={11} />
+                  </div>
+                  {locked && <Locked hint={unlockHint(t.unlock)} />}
+                </Option>
+              );
+            })}
           </div>
         </section>
 

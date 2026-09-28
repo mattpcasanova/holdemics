@@ -11,6 +11,7 @@ import type { ModeId } from "../engine/modes";
 export interface RankedPlayer {
   userId: string;
   name: string;
+  title?: string | null;
   rating: number;
   games: number;
 }
@@ -33,6 +34,8 @@ export interface SeatView {
   index: number;
   userId: string | null;
   name: string;
+  /** Selected profile title id, shown under the name. */
+  title: string | null;
   isBot: boolean;
   connected: boolean;
   isHost: boolean;

@@ -51,6 +51,7 @@ export default {
       const forward = new Request(`${url.origin}/ws?mode=${mode}`, request);
       forward.headers.set("X-User-Id", who.userId);
       forward.headers.set("X-Username", who.username);
+      if (who.title) forward.headers.set("X-Title", who.title);
       forward.headers.set("X-Rating", String(rating?.rating ?? 1500));
       forward.headers.set("X-Games", String(rating?.games ?? 0));
       return env.QUEUES.getByName(mode).fetch(forward);
@@ -82,6 +83,7 @@ export default {
       const forward = new Request(`${url.origin}/ws`, request);
       forward.headers.set("X-User-Id", who.userId);
       forward.headers.set("X-Username", who.username);
+      if (who.title) forward.headers.set("X-Title", who.title);
       return room.fetch(forward);
     }
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
+import { PlayerTitle } from "@/components/ui/PlayerTitle";
 import { SettingsButton } from "@/components/ui/SettingsDialog";
 import { SoundToggle } from "@/components/ui/SoundToggle";
 import { useTableSocket } from "@/hooks/useTableSocket";
@@ -179,6 +180,7 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
                 runout={view.runout}
                 heroSittingOut={!!heroSeat?.sittingOut}
                 botLabel={`${BOT_LEVELS[view.config.botLevel].name} bot`}
+                titles={view.seats.map((s) => s.title)}
               />
             ) : ranked ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
@@ -298,6 +300,7 @@ function SeatList({ seats, you }: { seats: SeatView[]; you: number | null }) {
               <>
                 <Avatar name={s.name} size={20} />
                 <span className={`flex-1 truncate ${s.index === you ? "font-medium text-gold" : "text-text-primary"}`}>{s.name}</span>
+                <PlayerTitle id={s.title} size={8.5} className="max-w-[90px]" />
                 {s.isHost && <span className="text-[10px] text-text-tertiary">host</span>}
                 {!s.connected && <span className="text-[10px] text-red-muted">away</span>}
               </>

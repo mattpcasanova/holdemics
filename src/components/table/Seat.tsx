@@ -1,4 +1,5 @@
 import { Avatar } from "@/components/ui/Avatar";
+import { PlayerTitle } from "@/components/ui/PlayerTitle";
 import { TagIcon } from "@/components/ui/TagIcon";
 import type { Card } from "@/lib/engine/cards";
 import type { PlayerState } from "@/lib/engine/game";
@@ -24,6 +25,7 @@ interface SeatProps {
   handNumber: number;
   clock?: ClockInfo | null;
   tag?: PlayerTag | null;
+  title?: string | null;
   selected?: boolean;
   onSelect?: (el: HTMLElement) => void;
   /** Dealer offset and per-card delays for the deal animation. */
@@ -66,6 +68,7 @@ export function Seat({
   handNumber,
   clock,
   tag,
+  title,
   selected = false,
   onSelect,
   deal,
@@ -154,6 +157,7 @@ export function Seat({
               </span>
               {tag && <TagIcon tag={tag} size={13} />}
             </div>
+            {title && <PlayerTitle id={title} size={8.5} className="mb-0.5" />}
             <div className="flex items-baseline gap-1">
               <span
                 className="font-display text-[15px] font-semibold tabular-nums leading-tight"

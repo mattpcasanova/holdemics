@@ -24,7 +24,7 @@ import type {
 } from "@/lib/realtime/protocol";
 import { redactGame } from "@/lib/realtime/view";
 import { ratingChanges } from "@/lib/rating";
-import { type GameFacts, type PlayerTotals, gameAchievements, milestoneAchievements } from "@/lib/achievements";
+import { type GameFacts, type PlayerTotals, ACHIEVEMENT_BY_ID, gameAchievements, milestoneAchievements } from "@/lib/achievements";
 import { STARTING_STACK } from "@/lib/engine/modes";
 import type { Env } from "./index";
 
@@ -40,6 +40,8 @@ import type { Env } from "./index";
 interface Seat {
   userId: string | null;
   name: string;
+  /** Selected profile title, shown under the name. */
+  title?: string | null;
   isBot: boolean;
   sittingOut: boolean;
   bankMs: number;
@@ -79,18 +81,29 @@ interface TableState {
 interface SeatFacts {
   minStack: number;
   ledFromFinalFour: boolean;
+  ledFromHalf: boolean;
+  ledSinceFirstBust: boolean;
   knockouts: number;
   worstShowdownLoss: number | null;
-  survivedAllIn: boolean;
+  survivedAllInShort: boolean;
 }
 
-const freshFacts = (): SeatFacts => ({ minStack: STARTING_STACK, ledFromFinalFour: true, knockouts: 0, worstShowdownLoss: null, survivedAllIn: false });
+const freshFacts = (): SeatFacts => ({
+  minStack: STARTING_STACK,
+  ledFromFinalFour: true,
+  ledFromHalf: true,
+  ledSinceFirstBust: true,
+  knockouts: 0,
+  worstShowdownLoss: null,
+  survivedAllInShort: false,
+});
 
 const RANKED_START_TIMEOUT_MS = 30_000;
 
 interface Attachment {
   userId: string;
   username: string;
+  title: string | null;
 }
 
 const PACE = { botMin: 650, botMax: 1500, handEnd: 1600, showdownEnd: 3200, firstDeal: 900 };
@@ -124,7 +137,7 @@ export class TableRoom extends DurableObject<Env> {
         phase: "lobby",
         seats: Array.from({ length: seats }, (_, i) => {
           const p = ranked ? config.players![i] : null;
-          return { userId: p?.userId ?? null, name: p?.name ?? "", isBot: false, sittingOut: false, bankMs: 0 };
+          return { userId: p?.userId ?? null, name: p?.name ?? "", title: p?.title ?? null, isBot: false, sittingOut: false, bankMs: 0 };
         }),
         game: null,
         turnStartedAt: null,
@@ -154,6 +167,7 @@ export class TableRoom extends DurableObject<Env> {
       const attachment: Attachment = {
         userId: request.headers.get("X-User-Id")!,
         username: request.headers.get("X-Username")!,
+        title: request.headers.get("X-Title") || null,
       };
       // Ranked tables are for the matched players only.
       if (this.state.config.ranked && !this.state.seats.some((s) => s.userId === attachment.userId)) {
@@ -310,7 +324,7 @@ export class TableRoom extends DurableObject<Env> {
     if (s.seats.some((x) => x.userId === who.userId)) return;
     const empty = s.seats.findIndex((x) => !x.userId && !x.isBot);
     if (empty < 0) return;
-    s.seats[empty] = { userId: who.userId, name: who.username, isBot: false, sittingOut: false, bankMs: 0 };
+    s.seats[empty] = { userId: who.userId, name: who.username, title: who.title, isBot: false, sittingOut: false, bankMs: 0 };
   }
 
   private stand(who: Attachment) {
@@ -475,10 +489,10 @@ export class TableRoom extends DurableObject<Env> {
       });
       if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
       s.ratingChanges = changes;
-      const totals = (await res.json()) as Record<string, { games: number; wins: number; headsup_wins: number; rating: number; rank: number | null }>;
+      const totals = (await res.json()) as Record<string, { games: number; wins: number; headsup_wins: number; streak: number; rating: number; rank: number | null }>;
       const byUser: Record<string, PlayerTotals> = {};
       for (const [uid, t] of Object.entries(totals)) {
-        byUser[uid] = { rankedGames: t.games, rankedWins: t.wins, headsUpWins: t.headsup_wins, rating: t.rating, rank: t.rank };
+        byUser[uid] = { rankedGames: t.games, rankedWins: t.wins, headsUpWins: t.headsup_wins, winStreak: t.streak ?? 0, rating: t.rating, rank: t.rank };
       }
       await this.awardGameAchievements(g, byUser);
     } catch (err) {
@@ -491,7 +505,7 @@ export class TableRoom extends DurableObject<Env> {
 
   // ─── Achievements ────────────────────────────────────────
 
-  /** At each hand start: lowest stack so far, and chip-leader status once four remain. */
+  /** At each hand start: lowest stack so far, and sole-chip-leader status for the Domination family. */
   private noteHandStart(g: GameState) {
     const facts = this.state!.facts;
     if (!facts) return;
@@ -500,11 +514,15 @@ export class TableRoom extends DurableObject<Env> {
     const alive = g.players.filter((p) => !p.eliminated);
     const top = Math.max(...alive.map(held));
     const leaders = alive.filter((p) => held(p) === top).length;
+    const total = g.players.length;
     g.players.forEach((p, i) => {
       const f = facts[i];
       if (!f || p.eliminated) return;
       f.minStack = Math.min(f.minStack, held(p));
-      if (alive.length <= 4 && !(held(p) === top && leaders === 1)) f.ledFromFinalFour = false;
+      const soleLeader = held(p) === top && leaders === 1;
+      if (alive.length <= 4 && !soleLeader) f.ledFromFinalFour = false;
+      if (alive.length * 2 <= total && !soleLeader) f.ledFromHalf = false;
+      if (alive.length < total && !soleLeader) f.ledSinceFirstBust = false;
     });
   }
 
@@ -523,7 +541,8 @@ export class TableRoom extends DurableObject<Env> {
         if (!f) continue;
         const won = (r.payouts[seat] ?? 0) > 0;
         if (!won) f.worstShowdownLoss = Math.max(f.worstShowdownLoss ?? -1, hand.value.category);
-        else if (g.players[seat].allIn) f.survivedAllIn = true;
+        // Covered: someone else at showdown put in more than the all-in player could.
+        else if (g.players[seat].allIn && Object.keys(r.hands).some((j) => g.players[Number(j)].totalBet > g.players[seat].totalBet)) f.survivedAllInShort = true;
       }
     }
   }
@@ -532,7 +551,7 @@ export class TableRoom extends DurableObject<Env> {
   private async awardGameAchievements(g: GameState, totals: Record<string, PlayerTotals>) {
     const s = this.state!;
     if (!s.facts) return;
-    const awards: { user_id: string; achievement_id: string }[] = [];
+    const awards: { user_id: string; achievement_id: string; reward_kind: string; reward_id: string }[] = [];
     s.seats.forEach((seat, i) => {
       if (!seat.userId || !s.facts![i]) return;
       const f = s.facts![i];
@@ -544,14 +563,19 @@ export class TableRoom extends DurableObject<Env> {
         handsPlayed: g.handNumber,
         minStack: f.minStack,
         ledFromFinalFour: f.ledFromFinalFour,
+        ledFromHalf: f.ledFromHalf,
+        ledSinceFirstBust: f.ledSinceFirstBust,
         knockouts: f.knockouts,
         worstShowdownLoss: f.worstShowdownLoss,
-        survivedAllIn: f.survivedAllIn,
+        survivedAllInShort: f.survivedAllInShort,
       };
       const ids = new Set(gameAchievements(gf));
       const t = totals[seat.userId];
       if (t) for (const id of milestoneAchievements(t, s.config.mode)) ids.add(id);
-      for (const id of ids) awards.push({ user_id: seat.userId, achievement_id: id });
+      for (const id of ids) {
+        const reward = ACHIEVEMENT_BY_ID.get(id)?.reward;
+        if (reward) awards.push({ user_id: seat.userId, achievement_id: id, reward_kind: reward.kind, reward_id: reward.id });
+      }
     });
     if (!awards.length) return;
     try {
@@ -593,6 +617,7 @@ export class TableRoom extends DurableObject<Env> {
         index,
         userId: seat.userId,
         name: seat.name,
+        title: seat.title ?? null,
         isBot: seat.isBot,
         connected: seat.isBot || (seat.userId !== null && this.isConnected(seat.userId)),
         isHost: seat.userId === s.config.hostId,

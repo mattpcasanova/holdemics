@@ -3,6 +3,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 export interface Identity {
   userId: string;
   username: string;
+  title: string | null;
 }
 
 const jwksByUrl = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -31,11 +32,11 @@ export async function identify(token: string, supabaseUrl: string, publishableKe
   }
   if (!sub) return null;
 
-  const res = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${sub}&select=username`, {
+  const res = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${sub}&select=username,title`, {
     headers: { apikey: publishableKey, Authorization: `Bearer ${token}` },
   });
   if (!res.ok) return null;
-  const rows = (await res.json()) as { username: string }[];
+  const rows = (await res.json()) as { username: string; title: string | null }[];
   const username = rows[0]?.username;
-  return username ? { userId: sub, username } : null;
+  return username ? { userId: sub, username, title: rows[0].title ?? null } : null;
 }

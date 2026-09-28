@@ -6,6 +6,8 @@ export interface Profile {
   id: string;
   username: string;
   avatar: string;
+  /** Selected title id, or null. */
+  title: string | null;
 }
 
 export interface Rating {
@@ -59,7 +61,7 @@ export async function getAccount(): Promise<Account | null> {
   if (!viewer) return null;
   const supabase = await createClient();
   const [profile, ratings, practice, ranked] = await Promise.all([
-    supabase.from("profiles").select("id, username, avatar").eq("id", viewer.id).maybeSingle(),
+    supabase.from("profiles").select("id, username, avatar, title").eq("id", viewer.id).maybeSingle(),
     supabase.from("ratings").select("mode, rating, peak, games").eq("user_id", viewer.id),
     supabase
       .from("practice_games")

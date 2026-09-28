@@ -8,6 +8,7 @@ export interface Settings {
   deckStyle: DeckStyle;
   cardBack: string;
   chips: string;
+  tableSkin: string;
   /** Enforce the decision clock in practice games. */
   practiceClock: boolean;
   sound: boolean;
@@ -19,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   deckStyle: "four-color",
   cardBack: "classic",
   chips: "classic",
+  tableSkin: "classic",
   practiceClock: true,
   sound: true,
   volume: 0.6,

@@ -104,12 +104,14 @@ node scripts/table-client.mjs CODE   # Scripted second player for two-human tabl
 - **Leaderboard**: `/leaderboard?mode=` lists the top 50 with ≥ placement games, tier via `tierFor` with rank = list position.
 - **Test**: `node scripts/friend-presence.mjs` signs in as the friend account, accepts pending requests, joins presence, and logs invites.
 
-## Achievements
+## Achievements & Cosmetics
 
-- Definitions and rules in `src/lib/achievements.ts` (tested in `achievements.test.ts`); who earned what in `player_achievements` (public read, server-only writes via the `award_achievements` RPC, guarded by the Vault secret and idempotent).
-- The table room gathers `SeatFacts` per seat (lowest held stack at hand starts counting posted blinds, chip-leader status from four players onward, knockouts credited to the hand's biggest winner, worst showdown loss, all-ins survived) and evaluates rules at game end. Milestone rules use the totals `record_ranked_result` returns.
-- **Eligibility**: ranked games, and private tables with no bots. Practice and bot-filled tables never award anything, so nothing can be farmed.
-- Newly earned ids ride along in `TableView.achievements` and show in the result dialog; `/achievements` lists the catalogue.
+- Definitions in `src/lib/achievements.ts` (tested in `achievements.test.ts`): tiered families (Comeback ×3, Domination ×3, Bounty ×3), table one-offs (Clean Sweep, Cooler/Bad Beat, Houdini), milestones (Ship It, Heater/Unstoppable streaks, games played, HU wins), tiers. Each has a **rarity** (common→legendary) and exactly one **reward** — a title, card back, or table skin of the same rarity (the test enforces both directions).
+- Cosmetic registries in `src/lib/cosmetics.ts`: `CARD_BACKS`, `TABLE_SKINS` (4 defaults + unlockables), `TITLES` (all unlockable), `RARITY` colors, `ownedCosmetics()`.
+- Storage: `player_achievements` (earned) + `player_cosmetics` (kind/item_id, granted by `award_achievements` alongside the achievement) + `profiles.title` (selected title; a trigger rejects titles the player doesn't own). `record_ranked_result` totals include the current win `streak`.
+- Server gathers `SeatFacts` per seat (min held stack incl. posted blinds; sole chip-leader from final four / half the field / first bust; knockouts to the hand's biggest winner; worst showdown loss; all-in won while covered) and evaluates at game end. **Eligibility**: ranked games and private tables with no bots.
+- Client: `unlocksStore` (`src/lib/unlocks.ts`) is filled by `AccountSync` (owned cosmetics, title, userId); Settings shows locked items with the unlocking achievement, and the title picker updates `profiles.title` directly. `settings.tableSkin` drives `PokerTable` felt/rail. Titles reach seats via `identify()` → `X-Title` header → `Seat.title` → `SeatView.title`, rendered by `PlayerTitle` (small caps, rarity color) under names at the table, in the lobby seat list, the profile card, and the leaderboard.
+- New ids ride along in `TableView.achievements` and show in the result dialog; `/achievements` lists the catalogue with rarity and reward.
 
 ## Rating
 
@@ -133,7 +135,7 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 2. ~~Supabase auth, profiles, per-mode ratings~~ (done); friends list after private tables
 3. ~~Server-authoritative multiplayer — private friend tables, unrated~~ (done; see Table Server)
 4. ~~Ranked matchmaking~~ (done; 8-max queues exist but need 8 concurrent players)
-5. ~~Achievements~~ (done); cosmetics (avatars, card backs, chip sets) and unlock rules
+5. ~~Achievements, titles, unlockable card backs and table skins~~ (done); avatars still to do
 
 ## Known Issues / Gotchas
 

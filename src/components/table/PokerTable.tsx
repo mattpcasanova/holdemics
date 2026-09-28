@@ -7,7 +7,9 @@ import type { Card } from "@/lib/engine/cards";
 import { describeHand, describeStartingHand, evaluate } from "@/lib/engine/evaluator";
 import { type GameState, buildPots, positionLabels } from "@/lib/engine/game";
 import { formatHp } from "@/lib/engine/modes";
+import { TABLE_SKINS } from "@/lib/cosmetics";
 import { noteKey, useNotes } from "@/lib/notes";
+import { useSettings } from "@/lib/settings";
 import { runoutSchedule } from "@/lib/practice/runout";
 import { play } from "@/lib/audio";
 import {
@@ -37,6 +39,8 @@ interface PokerTableProps {
   fast?: boolean;
   /** Label for bot players, e.g. "Regular bot". */
   botLabel?: string;
+  /** Selected title id per seat, shown under names. */
+  titles?: (string | null)[];
 }
 
 type Point = { x: number; y: number };
@@ -147,9 +151,12 @@ export function PokerTable({
   heroSittingOut = false,
   fast = false,
   botLabel = "Bot",
+  titles,
 }: PokerTableProps) {
   const [selected, setSelected] = useState<{ index: number; anchor: HTMLElement } | null>(null);
   const notes = useNotes();
+  const settings = useSettings();
+  const skin = TABLE_SKINS[settings.tableSkin] ?? TABLE_SKINS.classic;
   const wrapper = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
 
@@ -219,16 +226,15 @@ export function PokerTable({
           className="absolute rounded-[50%] p-[14px]"
           style={{
             inset: stage.felt,
-            background: "linear-gradient(180deg, #2A2F36 0%, #15181C 100%)",
+            background: `linear-gradient(180deg, ${skin.rail[0]} 0%, ${skin.rail[1]} 100%)`,
             boxShadow: "0 30px 60px -20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)",
           }}
         >
           <div
             className="relative h-full w-full rounded-[50%]"
             style={{
-              background:
-                "radial-gradient(ellipse at 50% 40%, #247C53 0%, var(--felt) 35%, var(--felt-deep) 72%, var(--felt-deepest) 100%)",
-              boxShadow: "inset 0 0 0 1px rgba(229,185,106,0.22), inset 0 12px 40px rgba(0,0,0,0.35)",
+              background: `radial-gradient(ellipse at 50% 40%, ${skin.felt[0]} 0%, ${skin.felt[1]} 35%, ${skin.felt[2]} 72%, ${skin.felt[3]} 100%)`,
+              boxShadow: `inset 0 0 0 1px ${skin.inlay}, inset 0 12px 40px rgba(0,0,0,0.35)`,
             }}
           >
             <div className="pointer-events-none absolute inset-[7%] rounded-[50%] border border-white/[0.05]" />
@@ -372,6 +378,7 @@ export function PokerTable({
                   won={won}
                   handNumber={game.handNumber}
                   tag={notes[noteKey(player)]?.tag}
+                  title={titles?.[i]}
                   selected={selected?.index === i}
                   onSelect={(anchor) => setSelected(selected?.index === i ? null : { index: i, anchor })}
                   deal={deal}
