@@ -4,26 +4,19 @@ import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import type { FriendsData } from "@/lib/friends";
 import { sendInvite, useOnline } from "@/lib/presence";
-import { createClient } from "@/lib/supabase/client";
 
 /** Online friends with one-click invites, shown in a private table's lobby. */
-export function InviteFriends({ code, mode, seatedIds }: { code: string; mode: string; seatedIds: string[] }) {
+export function InviteFriends({ code, modeId, seatedIds }: { code: string; modeId: string; seatedIds: string[] }) {
   const online = useOnline();
   const [friends, setFriends] = useState<FriendsData["friends"] | null>(null);
-  const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   // Friends invited in the last 30 seconds; cleared on a timer so the button re-enables.
   const [sent, setSent] = useState<Record<string, true>>({});
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/friends")
       .then((r) => (r.ok ? (r.json() as Promise<FriendsData>) : null))
       .then((d) => setFriends(d?.friends ?? []));
-    void createClient()
-      .auth.getClaims()
-      .then(({ data }) => {
-        const sub = data?.claims.sub;
-        if (sub) setMe({ id: sub, name: "" });
-      });
   }, []);
 
   if (!friends) return null;
@@ -38,10 +31,11 @@ export function InviteFriends({ code, mode, seatedIds }: { code: string; mode: s
         return (
           <button
             key={f.id}
-            disabled={!!recently || !me}
-            onClick={() => {
-              if (!me) return;
-              sendInvite({ to: f.id, from: me.id, fromName: online[me.id]?.username ?? "A friend", code, mode });
+            disabled={!!recently}
+            onClick={async () => {
+              const failed = await sendInvite(f.id, code, modeId);
+              if (failed) return setError(failed);
+              setError(null);
               setSent((s) => ({ ...s, [f.id]: true }));
               setTimeout(
                 () =>
@@ -61,6 +55,7 @@ export function InviteFriends({ code, mode, seatedIds }: { code: string; mode: s
           </button>
         );
       })}
+      {error && <span className="text-[#EFA3A3]">{error}</span>}
     </div>
   );
 }
