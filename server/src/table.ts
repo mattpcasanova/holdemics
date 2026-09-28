@@ -355,7 +355,6 @@ export class TableRoom extends DurableObject<Env> {
     const seed = Math.floor(Math.random() * 2 ** 31);
     s.game = createGame({ mode: s.config.mode, seats, seed });
     s.facts = Object.fromEntries(s.seats.map((_, i) => [i, freshFacts()]));
-    return true;
     s.phase = "playing";
     s.step++;
     s.due = { kind: "deal", at: Date.now() + PACE.firstDeal };

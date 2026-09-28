@@ -406,7 +406,7 @@ function LobbyTable({
             disabled={seatedHumans + bots < 2}
             className="rounded-lg bg-felt px-5 py-2.5 font-display text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-50"
           >
-            Start with {seatedHumans + bots} players
+            Start with {seatedHumans + bots} {seatedHumans + bots === 1 ? "player" : "players"}
           </button>
         )}
       </div>
