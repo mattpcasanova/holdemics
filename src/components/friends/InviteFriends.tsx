@@ -82,7 +82,7 @@ export function InviteFriends({ code, modeId, seatedIds }: { code: string; modeI
             return (
               <li key={f.id} className={`flex items-center gap-2.5 px-3.5 py-2 ${f.where ? "" : "opacity-55"}`}>
                 <span className="relative">
-                  <Avatar name={f.username} size={26} />
+                  <Avatar name={f.username} avatar={f.avatar} size={26} />
                   <span
                     className={`absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-surface-deep ${f.where ? "bg-felt-light" : "bg-text-tertiary"}`}
                     aria-hidden

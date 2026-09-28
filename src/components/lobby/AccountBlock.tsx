@@ -9,7 +9,7 @@ export function AccountBlock({ profile }: { profile: Profile | null }) {
   if (profile) {
     return (
       <div className="flex items-center gap-2.5 rounded-lg border border-border p-2.5">
-        <Avatar name={profile.username} size={32} />
+        <Avatar name={profile.username} avatar={profile.avatar} size={32} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-medium">{profile.username}</div>
           <form action={signOut}>

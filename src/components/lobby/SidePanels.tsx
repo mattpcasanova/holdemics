@@ -18,7 +18,7 @@ export function ProfileCard({ account }: { account: Account | null }) {
   return (
     <section aria-labelledby="profile-heading" className="rounded-xl border border-border bg-surface-primary p-4">
       <div className="flex items-center gap-3">
-        <Avatar name={account ? name : "guest"} size={40} />
+        <Avatar name={account ? name : "guest"} avatar={account?.profile.avatar} size={40} />
         <div className="min-w-0">
           <h2 id="profile-heading" className="truncate text-[14px] font-medium">
             {name}

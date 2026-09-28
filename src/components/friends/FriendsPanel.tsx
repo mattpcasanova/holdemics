@@ -45,7 +45,7 @@ export function FriendsPanel({ data }: { data: FriendsData }) {
                 return (
                   <li key={f.id} className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0">
                     <span className="relative">
-                      <Avatar name={f.username} size={32} />
+                      <Avatar name={f.username} avatar={f.avatar} size={32} />
                       <span
                         className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface-primary ${presence ? "bg-felt-light" : "bg-text-tertiary"}`}
                         aria-hidden
@@ -77,7 +77,7 @@ export function FriendsPanel({ data }: { data: FriendsData }) {
             <ul className="mt-3 flex flex-col gap-2">
               {data.incoming.map((r) => (
                 <li key={r.id} className="flex items-center gap-3">
-                  <Avatar name={r.username} size={28} />
+                  <Avatar name={r.username} avatar={r.avatar} size={28} />
                   <span className="flex-1 text-[13.5px] font-medium">{r.username}</span>
                   <button
                     onClick={() => call({ action: "accept", userId: r.id })}

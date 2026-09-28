@@ -8,7 +8,8 @@ import { play } from "@/lib/audio";
 import { SpeakerIcon } from "./SoundToggle";
 import { PlayerTitle } from "./PlayerTitle";
 import { ACHIEVEMENT_BY_ID } from "@/lib/achievements";
-import { type TableSkin, CARD_BACKS, CHIP_SETS, RARITY, TABLE_SKINS, TITLES, ownedCosmetics } from "@/lib/cosmetics";
+import { Avatar } from "./Avatar";
+import { type TableSkin, AVATARS, CARD_BACKS, CHIP_SETS, RARITY, TABLE_SKINS, TITLES, ownedCosmetics } from "@/lib/cosmetics";
 import type { Card } from "@/lib/engine/cards";
 import { type DeckStyle, settingsStore, useSettings } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/client";
@@ -97,11 +98,20 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useSettings();
   const unlocks = useUnlocks();
   const userId = unlocks.userId;
+  const displayName = unlocks.username ?? "You";
   const owned = ownedCosmetics(unlocks.owned);
   const ownsBack = new Set(owned.cardBacks.map((b) => b.id));
   const ownsTable = new Set(owned.tables.map((t) => t.id));
   const muted = !settings.sound || settings.volume === 0;
   const panel = useRef<HTMLDivElement>(null);
+
+  const chooseAvatar = async (id: string) => {
+    const prev = unlocks.avatar;
+    unlocksStore.set({ avatar: id });
+    if (!userId) return;
+    const { error } = await createClient().from("profiles").update({ avatar: id }).eq("id", userId);
+    if (error) unlocksStore.set({ avatar: prev });
+  };
 
   const chooseTitle = async (id: string | null) => {
     const prev = unlocks.title;
@@ -144,6 +154,32 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             ×
           </button>
         </div>
+
+        {userId && (
+          <section aria-labelledby="avatar-heading" className="mb-6">
+            <h3 id="avatar-heading" className="font-display text-[15px] font-semibold">
+              Avatar
+            </h3>
+            <p className="mb-3 text-[12.5px] text-text-secondary">How you appear at the table, to friends, and on the leaderboard.</p>
+            <div role="radiogroup" aria-labelledby="avatar-heading" className="grid grid-cols-6 gap-2 max-sm:grid-cols-4">
+              {Object.values(AVATARS).map((a) => (
+                <button
+                  key={a.id}
+                  role="radio"
+                  aria-checked={unlocks.avatar === a.id}
+                  aria-label={a.name}
+                  title={a.name}
+                  onClick={() => chooseAvatar(a.id)}
+                  className={`flex items-center justify-center rounded-xl border p-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold ${
+                    unlocks.avatar === a.id ? "border-gold/70 bg-gold/[0.06]" : "border-border bg-surface-deep hover:border-text-tertiary"
+                  }`}
+                >
+                  <Avatar name={displayName} avatar={a.id} size={40} />
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section aria-labelledby="deck-heading" className="mb-6">
           <h3 id="deck-heading" className="font-display text-[15px] font-semibold">

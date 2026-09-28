@@ -43,6 +43,7 @@ export class Queue extends DurableObject<Env> {
       userId: request.headers.get("X-User-Id")!,
       name: request.headers.get("X-Username")!,
       title: request.headers.get("X-Title") || null,
+      avatar: request.headers.get("X-Avatar") || "initials",
       rating: Number(request.headers.get("X-Rating")),
       games: Number(request.headers.get("X-Games")),
       joinedAt: Date.now(),
@@ -127,7 +128,7 @@ export class Queue extends DurableObject<Env> {
 
   private async createTable(mode: ModeId, seats: number, group: { ws: WebSocket; p: Waiting }[]) {
     const code = newCode();
-    const players: RankedPlayer[] = group.map(({ p }) => ({ userId: p.userId, name: p.name, title: p.title, rating: p.rating, games: p.games }));
+    const players: RankedPlayer[] = group.map(({ p }) => ({ userId: p.userId, name: p.name, title: p.title, avatar: p.avatar, rating: p.rating, games: p.games }));
     const body: CreateTableRequest = {
       config: { code, mode, hostId: players[0].userId, botLevel: "medium", seats, createdAt: Date.now(), ranked: true, players },
     };

@@ -19,7 +19,7 @@ interface Row {
   rating: number;
   peak: number;
   games: number;
-  profiles: { username: string; title: string | null } | null;
+  profiles: { username: string; title: string | null; avatar: string } | null;
 }
 
 export default async function LeaderboardPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
@@ -28,7 +28,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
   const [account, supabase] = await Promise.all([getAccount(), createClient()]);
   const { data } = await supabase
     .from("ratings")
-    .select("user_id, rating, peak, games, profiles(username, title)")
+    .select("user_id, rating, peak, games, profiles(username, title, avatar)")
     .eq("mode", mode)
     .gte("games", placementGames(mode))
     .order("rating", { ascending: false })
@@ -86,7 +86,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
               return (
                 <li key={r.user_id} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? "border-t border-border" : ""} ${isMe ? "bg-gold/[0.06]" : ""}`}>
                   <span className={`w-7 text-center font-display text-[14px] font-semibold tabular-nums ${i < 3 ? "text-gold" : "text-text-tertiary"}`}>{i + 1}</span>
-                  <Avatar name={r.profiles?.username ?? "?"} size={28} />
+                  <Avatar name={r.profiles?.username ?? "?"} avatar={r.profiles?.avatar} size={28} />
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate text-[13.5px] ${isMe ? "font-medium text-gold" : ""}`}>{r.profiles?.username ?? "unknown"}</span>
                     <PlayerTitle id={r.profiles?.title} size={9} />

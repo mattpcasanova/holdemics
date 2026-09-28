@@ -17,6 +17,7 @@ interface PlayerCardProps {
   botLabel: string | null;
   /** Selected profile title id. */
   title?: string | null;
+  avatar?: string | null;
   onClose: () => void;
 }
 
@@ -29,7 +30,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint: stri
   );
 }
 
-export function PlayerCard({ player, isHero, stats = EMPTY_STATS, botLabel, title, onClose }: PlayerCardProps) {
+export function PlayerCard({ player, isHero, stats = EMPTY_STATS, botLabel, title, avatar, onClose }: PlayerCardProps) {
   const notes = useNotes();
   const key = noteKey(player);
   const note = notes[key];
@@ -51,7 +52,7 @@ export function PlayerCard({ player, isHero, stats = EMPTY_STATS, botLabel, titl
       style={{ animation: "pop-in 160ms ease-out both" }}
     >
       <div className="flex items-start gap-3">
-        <Avatar name={player.name} size={44} />
+        <Avatar name={player.name} avatar={avatar} size={44} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate font-display text-[16px] font-semibold">{isHero ? "You" : player.name}</span>

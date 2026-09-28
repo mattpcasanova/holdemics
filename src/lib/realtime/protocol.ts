@@ -12,6 +12,7 @@ export interface RankedPlayer {
   userId: string;
   name: string;
   title?: string | null;
+  avatar?: string;
   rating: number;
   games: number;
 }
@@ -36,6 +37,7 @@ export interface SeatView {
   name: string;
   /** Selected profile title id, shown under the name. */
   title: string | null;
+  avatar: string;
   isBot: boolean;
   /** Difficulty of a bot seat. */
   botLevel: BotLevel | null;

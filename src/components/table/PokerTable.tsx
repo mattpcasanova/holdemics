@@ -43,6 +43,8 @@ interface PokerTableProps {
   titles?: (string | null)[];
   /** Per-seat bot labels, when bots differ in difficulty. */
   botLabels?: (string | null)[];
+  /** Per-seat avatar ids. */
+  avatars?: (string | null)[];
 }
 
 type Point = { x: number; y: number };
@@ -155,6 +157,7 @@ export function PokerTable({
   botLabel = "Bot",
   titles,
   botLabels,
+  avatars,
 }: PokerTableProps) {
   const [selected, setSelected] = useState<{ index: number; anchor: HTMLElement } | null>(null);
   const notes = useNotes();
@@ -382,6 +385,7 @@ export function PokerTable({
                   handNumber={game.handNumber}
                   tag={notes[noteKey(player)]?.tag}
                   title={titles?.[i]}
+                  avatar={avatars?.[i]}
                   selected={selected?.index === i}
                   onSelect={(anchor) => setSelected(selected?.index === i ? null : { index: i, anchor })}
                   deal={deal}
@@ -405,6 +409,7 @@ export function PokerTable({
             stats={stats[game.players[selected.index].id]}
             botLabel={game.players[selected.index].isBot ? (botLabels?.[selected.index] ?? botLabel) : null}
             title={titles?.[selected.index]}
+            avatar={avatars?.[selected.index]}
             onClose={() => setSelected(null)}
           />
         </Popover>

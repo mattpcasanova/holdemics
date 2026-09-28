@@ -17,7 +17,7 @@ const SAVE_DELAY_MS = 800;
 export function AccountSync({ userId }: { userId: string | null }) {
   useEffect(() => {
     if (!userId) {
-      unlocksStore.set({ userId: null, owned: [], title: null, loaded: false });
+      unlocksStore.set({ userId: null, username: null, owned: [], title: null, avatar: "initials", loaded: false });
       return;
     }
     const supabase = createClient();
@@ -30,10 +30,10 @@ export function AccountSync({ userId }: { userId: string | null }) {
         supabase.from("user_settings").select("settings").eq("user_id", userId).maybeSingle(),
         supabase.from("player_notes").select("subject, tag, note, updated_at"),
         supabase.from("player_cosmetics").select("kind, item_id").eq("user_id", userId),
-        supabase.from("profiles").select("title").eq("id", userId).maybeSingle(),
+        supabase.from("profiles").select("username, title, avatar").eq("id", userId).maybeSingle(),
       ]);
       if (cancelled) return;
-      unlocksStore.set({ userId, owned: cosmeticsRes.data ?? [], title: profileRes.data?.title ?? null, loaded: true });
+      unlocksStore.set({ userId, username: profileRes.data?.username ?? null, owned: cosmeticsRes.data ?? [], title: profileRes.data?.title ?? null, avatar: profileRes.data?.avatar ?? "initials", loaded: true });
 
       const remoteSettings = (settingsRes.data?.settings ?? {}) as Partial<Settings>;
       if (Object.keys(remoteSettings).length) {

@@ -3,12 +3,14 @@ import { createClient } from "./supabase/server";
 export interface FriendEntry {
   id: string;
   username: string;
+  avatar: string;
   since: string;
 }
 
 export interface FriendRequestEntry {
   id: string;
   username: string;
+  avatar: string;
   at: string;
 }
 
@@ -28,9 +30,13 @@ export async function getFriends(viewerId: string): Promise<FriendsData> {
   const requests = rows ?? [];
   const otherIds = [...new Set(requests.map((r) => (r.from_id === viewerId ? r.to_id : r.from_id)))];
   const names = new Map<string, string>();
+  const avatars = new Map<string, string>();
   if (otherIds.length) {
-    const { data: profiles } = await supabase.from("profiles").select("id, username").in("id", otherIds);
-    for (const p of profiles ?? []) names.set(p.id, p.username);
+    const { data: profiles } = await supabase.from("profiles").select("id, username, avatar").in("id", otherIds);
+    for (const p of profiles ?? []) {
+      names.set(p.id, p.username);
+      avatars.set(p.id, p.avatar);
+    }
   }
   const name = (id: string) => names.get(id) ?? "unknown";
 
@@ -39,9 +45,9 @@ export async function getFriends(viewerId: string): Promise<FriendsData> {
   const outgoing: FriendRequestEntry[] = [];
   for (const r of requests) {
     const other = r.from_id === viewerId ? r.to_id : r.from_id;
-    if (r.status === "accepted") friends.push({ id: other, username: name(other), since: r.responded_at ?? r.created_at });
-    else if (r.to_id === viewerId) incoming.push({ id: other, username: name(other), at: r.created_at });
-    else outgoing.push({ id: other, username: name(other), at: r.created_at });
+    if (r.status === "accepted") friends.push({ id: other, username: name(other), avatar: avatars.get(other) ?? "initials", since: r.responded_at ?? r.created_at });
+    else if (r.to_id === viewerId) incoming.push({ id: other, username: name(other), avatar: avatars.get(other) ?? "initials", at: r.created_at });
+    else outgoing.push({ id: other, username: name(other), avatar: avatars.get(other) ?? "initials", at: r.created_at });
   }
   friends.sort((a, b) => a.username.localeCompare(b.username));
   return { friends, incoming, outgoing };

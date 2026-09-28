@@ -26,6 +26,7 @@ interface SeatProps {
   clock?: ClockInfo | null;
   tag?: PlayerTag | null;
   title?: string | null;
+  avatar?: string | null;
   selected?: boolean;
   onSelect?: (el: HTMLElement) => void;
   /** Dealer offset and per-card delays for the deal animation. */
@@ -69,6 +70,7 @@ export function Seat({
   clock,
   tag,
   title,
+  avatar,
   selected = false,
   onSelect,
   deal,
@@ -149,7 +151,7 @@ export function Seat({
           </span>
         )}
         <div className="flex items-center gap-2">
-          <Avatar name={player.name} size={isHero ? 34 : 28} dimmed={out} ring={isActing ? "felt" : "none"} />
+          <Avatar name={player.name} avatar={avatar} size={isHero ? 34 : 28} dimmed={out} ring={isActing ? "felt" : "none"} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1">
               <span className={`truncate text-[12px] font-medium leading-tight ${isHero ? "text-gold" : "text-text-primary"}`}>

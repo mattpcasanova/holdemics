@@ -19,7 +19,7 @@ export function MobileTopBar({ profile }: { profile: Profile | null }) {
         <SettingsButton className="rounded-md px-2.5 py-1.5 text-[13px] text-text-secondary hover:bg-white/5">Settings</SettingsButton>
         {profile ? (
           <span className="ml-1" title={profile.username}>
-            <Avatar name={profile.username} size={28} />
+            <Avatar name={profile.username} avatar={profile.avatar} size={28} />
           </span>
         ) : (
           supabaseConfigured && (

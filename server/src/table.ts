@@ -42,6 +42,7 @@ interface Seat {
   name: string;
   /** Selected profile title, shown under the name. */
   title?: string | null;
+  avatar?: string;
   isBot: boolean;
   botLevel?: BotLevel;
   /** Co-host: can add/kick bots and players. */
@@ -110,6 +111,7 @@ interface Attachment {
   userId: string;
   username: string;
   title: string | null;
+  avatar: string;
 }
 
 const PACE = { botMin: 650, botMax: 1500, handEnd: 1600, showdownEnd: 3200, firstDeal: 900 };
@@ -143,7 +145,7 @@ export class TableRoom extends DurableObject<Env> {
         phase: "lobby",
         seats: Array.from({ length: seats }, (_, i) => {
           const p = ranked ? config.players![i] : null;
-          return { userId: p?.userId ?? null, name: p?.name ?? "", title: p?.title ?? null, isBot: false, sittingOut: false, bankMs: 0 };
+          return { userId: p?.userId ?? null, name: p?.name ?? "", title: p?.title ?? null, avatar: p?.avatar ?? "initials", isBot: false, sittingOut: false, bankMs: 0 };
         }),
         game: null,
         turnStartedAt: null,
@@ -174,6 +176,7 @@ export class TableRoom extends DurableObject<Env> {
         userId: request.headers.get("X-User-Id")!,
         username: request.headers.get("X-Username")!,
         title: request.headers.get("X-Title") || null,
+        avatar: request.headers.get("X-Avatar") || "initials",
       };
       // Ranked tables are for the matched players only.
       if (this.state.config.ranked && !this.state.seats.some((s) => s.userId === attachment.userId)) {
@@ -391,7 +394,7 @@ export class TableRoom extends DurableObject<Env> {
     if (s.seats.some((x) => x.userId === who.userId)) return;
     const empty = s.seats.findIndex((x) => !x.userId && !x.isBot);
     if (empty < 0) return;
-    s.seats[empty] = { userId: who.userId, name: who.username, title: who.title, isBot: false, sittingOut: false, bankMs: 0 };
+    s.seats[empty] = { userId: who.userId, name: who.username, title: who.title, avatar: who.avatar, isBot: false, sittingOut: false, bankMs: 0 };
   }
 
   private stand(who: Attachment) {
@@ -677,6 +680,7 @@ export class TableRoom extends DurableObject<Env> {
         userId: seat.userId,
         name: seat.name,
         title: seat.title ?? null,
+        avatar: seat.avatar ?? "initials",
         isBot: seat.isBot,
         botLevel: seat.isBot ? (seat.botLevel ?? s.config.botLevel) : null,
         connected: seat.isBot || (seat.userId !== null && this.isConnected(seat.userId)),

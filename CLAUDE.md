@@ -108,10 +108,10 @@ node scripts/table-client.mjs CODE   # Scripted second player for two-human tabl
 ## Achievements & Cosmetics
 
 - Definitions in `src/lib/achievements.ts` (tested in `achievements.test.ts`): tiered families (Comeback ×3, Domination ×3, Bounty ×3), table one-offs (Clean Sweep, Cooler/Bad Beat, Houdini), milestones (Ship It, Heater/Unstoppable streaks, games played, HU wins), tiers. Each has a **rarity** (common→legendary) and exactly one **reward** — a title, card back, or table skin of the same rarity (the test enforces both directions).
-- Cosmetic registries in `src/lib/cosmetics.ts`: `CARD_BACKS`, `TABLE_SKINS` (4 defaults + unlockables), `TITLES` (all unlockable), `RARITY` colors, `ownedCosmetics()`.
+- Cosmetic registries in `src/lib/cosmetics.ts`: `CARD_BACKS`, `TABLE_SKINS` (4 defaults + unlockables), `TITLES` (all unlockable), `AVATARS` (12 free SVG glyph designs; `initials` is the default and `Avatar` falls back to it), `RARITY` colors, `ownedCosmetics()`.
 - Storage: `player_achievements` (earned) + `player_cosmetics` (kind/item_id, granted by `award_achievements` alongside the achievement) + `profiles.title` (selected title; a trigger rejects titles the player doesn't own). `record_ranked_result` totals include the current win `streak`.
 - Server gathers `SeatFacts` per seat (min held stack incl. posted blinds; sole chip-leader from final four / half the field / first bust; knockouts to the hand's biggest winner; worst showdown loss; all-in won while covered) and evaluates at game end. **Eligibility**: ranked games and private tables with no bots.
-- Client: `unlocksStore` (`src/lib/unlocks.ts`) is filled by `AccountSync` (owned cosmetics, title, userId); Settings shows locked items with the unlocking achievement, and the title picker updates `profiles.title` directly. `settings.tableSkin` drives `PokerTable` felt/rail. Titles reach seats via `identify()` → `X-Title` header → `Seat.title` → `SeatView.title`, rendered by `PlayerTitle` (small caps, rarity color) under names at the table, in the lobby seat list, the profile card, and the leaderboard.
+- Client: `unlocksStore` (`src/lib/unlocks.ts`) is filled by `AccountSync` (owned cosmetics, title, userId); Settings shows locked items with the unlocking achievement, and the title picker updates `profiles.title` directly. `settings.tableSkin` drives `PokerTable` felt/rail. The chosen avatar lives in `profiles.avatar` (picked in Settings, mirrored in `unlocksStore.avatar`) and travels the same road as titles. Titles reach seats via `identify()` → `X-Title` header → `Seat.title` → `SeatView.title`, rendered by `PlayerTitle` (small caps, rarity color) under names at the table, in the lobby seat list, the profile card, and the leaderboard.
 - New ids ride along in `TableView.achievements` and show in the result dialog; `/achievements` lists the catalogue with rarity and reward.
 
 ## Rating
@@ -136,7 +136,8 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 2. ~~Supabase auth, profiles, per-mode ratings~~ (done); friends list after private tables
 3. ~~Server-authoritative multiplayer — private friend tables, unrated~~ (done; see Table Server)
 4. ~~Ranked matchmaking~~ (done; 8-max queues exist but need 8 concurrent players)
-5. ~~Achievements, titles, unlockable card backs and table skins~~ (done); avatars still to do
+5. ~~Achievements, titles, unlockable card backs, table skins, avatars~~ (done)
+6. Deploy the table server (needs `wrangler login`; `ALLOWED_ORIGIN` takes a comma-separated list) and link Vercel
 
 ## Known Issues / Gotchas
 

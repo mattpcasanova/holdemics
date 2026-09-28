@@ -99,6 +99,38 @@ export const TITLES: Record<string, Title> = Object.fromEntries(
   ).map(([id, text, rarity, unlock]) => [id, { id, text, rarity, unlock }]),
 );
 
+export type AvatarGlyph = "initials" | "spade" | "heart" | "diamond" | "club" | "chip" | "crown" | "fish" | "shark" | "ace" | "dice" | "flame";
+
+export interface AvatarSkin {
+  id: string;
+  name: string;
+  glyph: AvatarGlyph;
+  bg: string;
+  fg: string;
+  rarity: Rarity;
+  unlock?: string;
+}
+
+/** Profile pictures. "initials" uses the player's name on a colour picked from it. */
+export const AVATARS: Record<string, AvatarSkin> = Object.fromEntries(
+  (
+    [
+      ["initials", "Initials", "initials", "", ""],
+      ["spade", "Spade", "spade", "#1B1E23", "#E8EAED"],
+      ["heart", "Heart", "heart", "#4A1E24", "#F08A8A"],
+      ["diamond", "Diamond", "diamond", "#1E3A5A", "#8FC3E8"],
+      ["club", "Club", "club", "#1E4A33", "#9FE8C4"],
+      ["chip", "Chip", "chip", "#2A2418", "#E5B96A"],
+      ["crown", "Crown", "crown", "#3D1F6E", "#E5B96A"],
+      ["fish", "Fish", "fish", "#153E4A", "#7FD1E0"],
+      ["shark", "Shark", "shark", "#0E1013", "#C9CDD4"],
+      ["ace", "Ace", "ace", "#F4F1EA", "#1A1D21"],
+      ["dice", "Dice", "dice", "#3A2F4A", "#E6DAF7"],
+      ["flame", "Flame", "flame", "#4C1F11", "#FFB067"],
+    ] as [string, string, AvatarGlyph, string, string][]
+  ).map(([id, name, glyph, bg, fg]) => [id, { id, name, glyph, bg, fg, rarity: "common" as Rarity }]),
+);
+
 export interface ChipFace {
   base: string;
   stripe: string;

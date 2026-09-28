@@ -182,6 +182,7 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
                 heroSittingOut={!!heroSeat?.sittingOut}
                 botLabel={`${BOT_LEVELS[view.config.botLevel].name} bot`}
                 titles={view.seats.map((s) => s.title)}
+                avatars={view.seats.map((s) => s.avatar)}
                 botLabels={view.seats.map((s) => (s.botLevel ? `${BOT_LEVELS[s.botLevel].name} bot` : null))}
               />
             ) : ranked ? (
@@ -305,7 +306,7 @@ function SeatList({ seats, you }: { seats: SeatView[]; you: number | null }) {
             <span className="w-4 text-center text-text-tertiary">{s.index + 1}</span>
             {s.userId ? (
               <>
-                <Avatar name={s.name} size={20} />
+                <Avatar name={s.name} avatar={s.avatar} size={20} />
                 <span className={`flex-1 truncate ${s.index === you ? "font-medium text-gold" : "text-text-primary"}`}>{s.name}</span>
                 <PlayerTitle id={s.title} size={8.5} className="max-w-[90px]" />
                 <RoleBadge seat={s} size="sm" />
@@ -416,7 +417,7 @@ function LobbyTable({
               )}
               {s.userId ? (
                 <>
-                  <Avatar name={s.name} size={36} ring={s.index === you ? "gold" : "none"} />
+                  <Avatar name={s.name} avatar={s.avatar} size={36} ring={s.index === you ? "gold" : "none"} />
                   <span className="max-w-full truncate text-[12px] font-medium">{s.name}</span>
                   {s.isHost || s.isMod ? <RoleBadge seat={s} /> : <span className="text-[10px] text-text-tertiary">{s.connected ? "Ready" : "Away"}</span>}
                   {isHost && !s.isHost && (

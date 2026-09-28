@@ -11,6 +11,7 @@ export interface Env {
   QUEUES: DurableObjectNamespace<Queue>;
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
+  /** Comma-separated browser origins allowed to open sockets (localhost + the deployed site). */
   ALLOWED_ORIGIN: string;
   TABLE_SERVER_SECRET: string;
 }
@@ -28,6 +29,11 @@ function json(body: unknown, status = 200) {
  *   GET  /tables/:code                                           — public summary (exists, phase, seats)
  *   GET  /queue/:mode/ws?token=<supabase jwt>                    — ranked matchmaking WebSocket
  */
+function originAllowed(origin: string | null, env: Env): boolean {
+  if (!origin) return true; // non-browser clients (test scripts) send no Origin
+  return env.ALLOWED_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean).includes(origin);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -38,7 +44,7 @@ export default {
       if (!(mode in MODES)) return json({ error: "Bad mode" }, 400);
       if (request.headers.get("Upgrade") !== "websocket") return json({ error: "Expected a WebSocket" }, 426);
       const origin = request.headers.get("Origin");
-      if (origin && origin !== env.ALLOWED_ORIGIN) return json({ error: "Origin not allowed" }, 403);
+      if (!originAllowed(origin, env)) return json({ error: "Origin not allowed" }, 403);
       const token = url.searchParams.get("token") ?? "";
       const who = token ? await identify(token, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY) : null;
       if (!who) return json({ error: "Sign in to play ranked" }, 401);
@@ -52,6 +58,7 @@ export default {
       forward.headers.set("X-User-Id", who.userId);
       forward.headers.set("X-Username", who.username);
       if (who.title) forward.headers.set("X-Title", who.title);
+      forward.headers.set("X-Avatar", who.avatar);
       forward.headers.set("X-Rating", String(rating?.rating ?? 1500));
       forward.headers.set("X-Games", String(rating?.games ?? 0));
       return env.QUEUES.getByName(mode).fetch(forward);
@@ -75,7 +82,7 @@ export default {
     if (sub === "ws") {
       if (request.headers.get("Upgrade") !== "websocket") return json({ error: "Expected a WebSocket" }, 426);
       const origin = request.headers.get("Origin");
-      if (origin && origin !== env.ALLOWED_ORIGIN) return json({ error: "Origin not allowed" }, 403);
+      if (!originAllowed(origin, env)) return json({ error: "Origin not allowed" }, 403);
       const token = url.searchParams.get("token") ?? "";
       const who = token ? await identify(token, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY) : null;
       if (!who) return json({ error: "Sign in to join a table" }, 401);
@@ -84,6 +91,7 @@ export default {
       forward.headers.set("X-User-Id", who.userId);
       forward.headers.set("X-Username", who.username);
       if (who.title) forward.headers.set("X-Title", who.title);
+      forward.headers.set("X-Avatar", who.avatar);
       return room.fetch(forward);
     }
 
