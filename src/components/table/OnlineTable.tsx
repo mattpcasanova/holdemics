@@ -25,6 +25,7 @@ interface OnlineTableProps {
 
 export function OnlineTable({ code, serverWs }: OnlineTableProps) {
   const { view, status, error, clearError, act, sit, stand, start, back } = useTableSocket(code, serverWs);
+  const [botCount, setBotCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dismissedResult, setDismissedResult] = useState(false);
@@ -187,7 +188,17 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
                 </p>
               </div>
             ) : (
-              <LobbyTable view={view} you={you} isHost={isHost} onSit={sit} onStand={stand} onStart={start} seatedHumans={seatedHumans} />
+              <LobbyTable
+                view={view}
+                you={you}
+                isHost={isHost}
+                onSit={sit}
+                onStand={stand}
+                onStart={() => start(botCount)}
+                seatedHumans={seatedHumans}
+                botCount={botCount}
+                onBotCount={setBotCount}
+              />
             )}
           </div>
           <div className="mx-auto w-full max-w-[880px] shrink-0">
@@ -309,6 +320,8 @@ function LobbyTable({
   onSit,
   onStand,
   onStart,
+  botCount,
+  onBotCount,
 }: {
   view: TableView;
   you: number | null;
@@ -317,19 +330,24 @@ function LobbyTable({
   onSit: () => void;
   onStand: () => void;
   onStart: () => void;
+  botCount: number;
+  onBotCount: (n: number) => void;
 }) {
-  const config = MODES[view.config.mode];
-  const open = view.seats.length - seatedHumans;
+  const total = view.seats.length;
+  const open = total - seatedHumans;
+  const bots = Math.min(botCount, open);
+  // Rows that divide evenly: one row up to 7 seats, then 4+4 and 3+3+3.
+  const cols = total <= 7 ? total : total === 8 ? 4 : 3;
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
       <div>
         <div className="font-display text-[26px] font-semibold tracking-tight">Waiting for players</div>
-        <p className="mt-1 max-w-[46ch] text-[14px] text-text-secondary">
-          Share the code <span className="font-display font-semibold text-gold">{view.config.code}</span> or the page link. {seatedHumans} of {view.seats.length} seats taken
-          {open > 0 ? `; empty seats get ${BOT_LEVELS[view.config.botLevel].name} bots when the game starts.` : "."}
+        <p className="mt-1 max-w-[48ch] text-[14px] text-text-secondary">
+          Share the code <span className="font-display font-semibold text-gold">{view.config.code}</span> or the page link. {seatedHumans} of {total} seats taken.
+          {isHost && open > 0 ? " Add bots below, or start with just the players here." : ""}
         </p>
       </div>
-      <div className="flex flex-wrap justify-center gap-2">
+      <div className="grid justify-center gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 120px)` }}>
         {view.seats.map((s) => (
           <div key={s.index} className={`flex w-[120px] flex-col items-center gap-1.5 rounded-xl border p-3 ${s.userId ? "border-border bg-surface-deep" : "border-dashed border-white/15"}`}>
             {s.userId ? (
@@ -337,6 +355,14 @@ function LobbyTable({
                 <Avatar name={s.name} size={36} ring={s.index === you ? "gold" : "none"} />
                 <span className="max-w-full truncate text-[12px] font-medium">{s.name}</span>
                 <span className="text-[10px] text-text-tertiary">{s.isHost ? "Host" : s.connected ? "Ready" : "Away"}</span>
+              </>
+            ) : view.seats.slice(0, s.index).filter((x) => !x.userId).length < bots ? (
+              <>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-card text-[14px]" aria-hidden>
+                  🤖
+                </div>
+                <span className="text-[12px] text-text-secondary">{BOT_LEVELS[view.config.botLevel].name} bot</span>
+                <span className="text-[10px] text-text-tertiary">Joins at start</span>
               </>
             ) : (
               <>
@@ -349,6 +375,21 @@ function LobbyTable({
         ))}
       </div>
       {open > 0 && <InviteFriends code={view.config.code} modeId={view.config.mode} seatedIds={view.seats.map((s) => s.userId).filter((id): id is string => !!id)} />}
+      {isHost && open > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-deep px-3 py-2 text-[13px]">
+          <span className="text-text-secondary">Bots</span>
+          <button onClick={() => onBotCount(Math.max(0, bots - 1))} disabled={bots === 0} aria-label="Fewer bots" className="h-7 w-7 rounded-md border border-border text-text-secondary hover:bg-white/5 disabled:opacity-40">
+            −
+          </button>
+          <span className="w-4 text-center font-display text-[15px] font-semibold tabular-nums">{bots}</span>
+          <button onClick={() => onBotCount(Math.min(open, bots + 1))} disabled={bots >= open} aria-label="More bots" className="h-7 w-7 rounded-md border border-border text-text-secondary hover:bg-white/5 disabled:opacity-40">
+            +
+          </button>
+          <span className="text-text-tertiary">
+            {seatedHumans + bots} of {total} seats · {BOT_LEVELS[view.config.botLevel].name}
+          </span>
+        </div>
+      )}
       <div className="flex gap-2">
         {you === null ? (
           <button onClick={onSit} className="rounded-lg bg-gold px-5 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110">
@@ -360,8 +401,12 @@ function LobbyTable({
           </button>
         )}
         {isHost && (
-          <button onClick={onStart} className="rounded-lg bg-felt px-5 py-2.5 font-display text-[14px] font-semibold text-white hover:brightness-110">
-            Start {config.name}
+          <button
+            onClick={onStart}
+            disabled={seatedHumans + bots < 2}
+            className="rounded-lg bg-felt px-5 py-2.5 font-display text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-50"
+          >
+            Start with {seatedHumans + bots} players
           </button>
         )}
       </div>

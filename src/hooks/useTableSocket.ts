@@ -103,7 +103,7 @@ export function useTableSocket(code: string, serverWs: string) {
     act,
     sit: () => send({ type: "sit" }),
     stand: () => send({ type: "stand" }),
-    start: () => send({ type: "start" }),
+    start: (bots = 0) => send({ type: "start", bots }),
     back: () => send({ type: "back" }),
   };
 }

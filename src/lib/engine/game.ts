@@ -3,6 +3,7 @@ import { type HandValue, describeHand, evaluate } from "./evaluator";
 import {
   type Blinds,
   type ModeId,
+  MAX_SEATS,
   MODES,
   STARTING_STACK,
   blindsForLevel,
@@ -115,9 +116,8 @@ export interface LegalActions {
 // ─── Setup ───────────────────────────────────────────────
 
 export function createGame(opts: { mode: ModeId; seats: SeatInfo[]; seed: number }): GameState {
-  const mode = MODES[opts.mode];
-  if (opts.seats.length < 2 || opts.seats.length > mode.seats) {
-    throw new Error(`${mode.name} needs 2–${mode.seats} players`);
+  if (opts.seats.length < 2 || opts.seats.length > MAX_SEATS) {
+    throw new Error(`Tables seat 2–${MAX_SEATS} players`);
   }
   const rng = createRng(opts.seed);
   const players: PlayerState[] = opts.seats.map((s) => ({
@@ -205,6 +205,16 @@ export function legalActions(state: GameState): LegalActions | null {
   };
 }
 
+/** Names for the seats between the big blind and the button, by table size. */
+const MIDDLE_POSITIONS: Record<number, string[]> = {
+  4: ["UTG"],
+  5: ["UTG", "CO"],
+  6: ["UTG", "HJ", "CO"],
+  7: ["UTG", "LJ", "HJ", "CO"],
+  8: ["UTG", "UTG+1", "LJ", "HJ", "CO"],
+  9: ["UTG", "UTG+1", "UTG+2", "LJ", "HJ", "CO"],
+};
+
 /** Position labels keyed by player index, for players dealt into the current hand. */
 export function positionLabels(state: GameState): Record<number, string> {
   const labels: Record<number, string> = {};
@@ -224,12 +234,12 @@ export function positionLabels(state: GameState): Record<number, string> {
     labels[order[1]] = "BB";
     return labels;
   }
-  const middle = ["UTG", "UTG+1", "MP", "HJ", "CO"].slice(5 - (order.length - 3));
+  const middle = MIDDLE_POSITIONS[order.length] ?? [];
   order.forEach((idx, k) => {
     if (k === 0) labels[idx] = "BTN";
     else if (k === 1) labels[idx] = "SB";
     else if (k === 2) labels[idx] = "BB";
-    else labels[idx] = middle[k - 3];
+    else labels[idx] = middle[k - 3] ?? "";
   });
   return labels;
 }

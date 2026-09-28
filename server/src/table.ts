@@ -115,7 +115,8 @@ export class TableRoom extends DurableObject<Env> {
     if (path === "/create") {
       const { config } = (await request.json()) as CreateTableRequest;
       if (this.state) return Response.json({ error: "Table already exists" }, { status: 409 });
-      const seats = MODES[config.mode].seats;
+      const seats = config.ranked ? MODES[config.mode].seats : config.seats;
+      if (!Number.isInteger(seats) || seats < 2 || seats > 9) return Response.json({ error: "Tables seat 2–9 players" }, { status: 400 });
       const ranked = !!config.ranked && !!config.players;
       if (ranked && config.players!.length !== seats) return Response.json({ error: "Ranked tables must be full" }, { status: 400 });
       this.state = {
@@ -203,7 +204,7 @@ export class TableRoom extends DurableObject<Env> {
       case "start":
         if (this.state.config.ranked) return;
         if (who.userId !== this.state.config.hostId) return this.send(ws, { type: "error", message: "Only the host can start the game." });
-        this.startGame();
+        if (!this.startGame(msg.bots ?? 0)) return this.send(ws, { type: "error", message: "A game needs at least two players. Add a bot or wait for a friend." });
         break;
       case "back":
         if (seat >= 0) this.state.seats[seat].sittingOut = false;
@@ -319,21 +320,33 @@ export class TableRoom extends DurableObject<Env> {
     if (i >= 0) s.seats[i] = { userId: null, name: "", isBot: false, sittingOut: false, bankMs: 0 };
   }
 
-  private startGame() {
+  /**
+   * Start with the seated humans plus `botCount` bots (ranked: everyone is
+   * seated already and no bots are added). Empty seats beyond that are
+   * removed so the game has exactly the players at the table.
+   */
+  private startGame(botCount = 0): boolean {
     const s = this.state!;
-    if (s.phase !== "lobby") return;
+    if (s.phase !== "lobby") return false;
     const humans = s.seats.filter((x) => x.userId);
-    if (humans.length === 0) return;
+    if (humans.length === 0) return false;
 
-    // Fill the empty seats with bots so the table is full (never on ranked tables).
-    const bots = botSeats(s.seats.length - humans.length, s.config.botLevel);
+    const open = s.seats.filter((x) => !x.userId).length;
+    const bots = s.config.ranked ? [] : botSeats(Math.max(0, Math.min(botCount, open)), s.config.botLevel);
     let b = 0;
     for (const seat of s.seats) {
-      if (seat.userId) continue;
+      if (seat.userId || b >= bots.length) continue;
       const bot = bots[b++];
       seat.isBot = true;
       seat.name = bot.name;
       seat.userId = null;
+    }
+    // Drop empty seats; players keep their relative order around the table.
+    s.seats = s.seats.filter((x) => x.userId || x.isBot);
+    if (s.seats.length < 2) {
+      for (const seat of s.seats) if (seat.isBot) Object.assign(seat, { isBot: false, name: "" });
+      s.seats = Array.from({ length: s.config.ranked ? MODES[s.config.mode].seats : s.config.seats }, (_, i) => s.seats[i] ?? { userId: null, name: "", isBot: false, sittingOut: false, bankMs: 0 });
+      return false;
     }
     const seats: SeatInfo[] = s.seats.map((seat, i) => ({ id: seat.userId ?? `bot-${i}`, name: seat.name, isBot: seat.isBot }));
     const bank = MODES[s.config.mode].timeBankSeconds * 1000;
@@ -342,9 +355,11 @@ export class TableRoom extends DurableObject<Env> {
     const seed = Math.floor(Math.random() * 2 ** 31);
     s.game = createGame({ mode: s.config.mode, seats, seed });
     s.facts = Object.fromEntries(s.seats.map((_, i) => [i, freshFacts()]));
+    return true;
     s.phase = "playing";
     s.step++;
     s.due = { kind: "deal", at: Date.now() + PACE.firstDeal };
+    return true;
   }
 
   // ─── Game transitions ────────────────────────────────────

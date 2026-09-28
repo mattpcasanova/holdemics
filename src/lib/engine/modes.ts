@@ -3,6 +3,8 @@
  * opening small blind be 0.5 HP while keeping all math integral.
  */
 export const UNITS_PER_HP = 10;
+/** Most seats at any table (custom tables pick 2–9; ranked modes fix their own). */
+export const MAX_SEATS = 9;
 export const STARTING_HP = 100;
 export const STARTING_STACK = STARTING_HP * UNITS_PER_HP;
 

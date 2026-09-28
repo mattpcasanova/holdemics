@@ -141,7 +141,9 @@ describe("game flow", () => {
   it("labels 8-max positions", () => {
     const g = startHand(createGame({ mode: "standard", seats: seats(8), seed: 2 }));
     const labels = Object.values(positionLabels(g)).sort();
-    expect(labels).toEqual(["BB", "BTN", "CO", "HJ", "MP", "SB", "UTG", "UTG+1"].sort());
+    expect(labels).toEqual(["BB", "BTN", "CO", "HJ", "LJ", "SB", "UTG", "UTG+1"].sort());
+    const nine = startHand(createGame({ mode: "standard", seats: seats(9), seed: 2 }));
+    expect(Object.values(positionLabels(nine)).sort()).toEqual(["BB", "BTN", "CO", "HJ", "LJ", "SB", "UTG", "UTG+1", "UTG+2"].sort());
   });
 
   it("plays random games to completion with unique placements and conserved chips", () => {

@@ -118,17 +118,17 @@ export class Queue extends DurableObject<Env> {
         pool = pool.slice(1);
         continue;
       }
-      await this.createTable(mode, group);
+      await this.createTable(mode, seats, group);
       const seated = new Set(group.map((g) => g.p.userId));
       pool = pool.filter(({ p }) => !seated.has(p.userId));
     }
   }
 
-  private async createTable(mode: ModeId, group: { ws: WebSocket; p: Waiting }[]) {
+  private async createTable(mode: ModeId, seats: number, group: { ws: WebSocket; p: Waiting }[]) {
     const code = newCode();
     const players: RankedPlayer[] = group.map(({ p }) => ({ userId: p.userId, name: p.name, rating: p.rating, games: p.games }));
     const body: CreateTableRequest = {
-      config: { code, mode, hostId: players[0].userId, botLevel: "medium", createdAt: Date.now(), ranked: true, players },
+      config: { code, mode, hostId: players[0].userId, botLevel: "medium", seats, createdAt: Date.now(), ranked: true, players },
     };
     const room = this.env.TABLES.getByName(code);
     const res = await room.fetch(new Request("https://table/create", { method: "POST", body: JSON.stringify(body) }));

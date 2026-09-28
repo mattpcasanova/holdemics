@@ -19,8 +19,10 @@ export interface TableConfig {
   code: string;
   mode: ModeId;
   hostId: string;
-  /** Bots used to fill empty seats when the host starts the game. */
+  /** Difficulty of any bots the host adds when starting. */
   botLevel: BotLevel;
+  /** Number of seats at the table (2–9). Ranked tables use the mode's seat count. */
+  seats: number;
   createdAt: number;
   /** Ranked tables are created by the matchmaker with fixed players and no bots. */
   ranked?: boolean;
@@ -81,7 +83,8 @@ export interface TableView {
 export type ClientMessage =
   | { type: "sit" }
   | { type: "stand" }
-  | { type: "start" }
+  /** Host starts the game, adding `bots` bots to the empty seats (0 = none). */
+  | { type: "start"; bots?: number }
   | { type: "act"; action: Action; hand: number; step: number }
   | { type: "back" }
   | { type: "ping" };

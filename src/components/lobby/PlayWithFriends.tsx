@@ -4,12 +4,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { type BotLevel, BOT_LEVELS } from "@/lib/engine/bots";
-import { type ModeId, MODES } from "@/lib/engine/modes";
+import { MAX_SEATS, type ModeId } from "@/lib/engine/modes";
+
+const SPEEDS: { id: ModeId; label: string; blurb: string }[] = [
+  { id: "standard", label: "Standard", blurb: "Blinds up every orbit" },
+  { id: "turbo", label: "Turbo", blurb: "Blinds up every half orbit" },
+];
+const SIZES = Array.from({ length: MAX_SEATS - 1 }, (_, i) => i + 2);
 
 /** Create a private table and share its code, or join one by code. Private games are unrated. */
 export function PlayWithFriends({ signedIn }: { signedIn: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<ModeId>("standard");
+  const [seats, setSeats] = useState(6);
   const [bots, setBots] = useState<BotLevel>("medium");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,7 +28,7 @@ export function PlayWithFriends({ signedIn }: { signedIn: boolean }) {
     const res = await fetch("/api/tables", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode, botLevel: bots }),
+      body: JSON.stringify({ mode: seats === 2 ? "headsup" : mode, botLevel: bots, seats }),
     }).catch(() => null);
     const data = (await res?.json().catch(() => null)) as { code?: string; error?: string } | null;
     if (!res?.ok || !data?.code) {
@@ -45,7 +52,7 @@ export function PlayWithFriends({ signedIn }: { signedIn: boolean }) {
         Play with friends
       </h2>
       <p className="mt-1 text-[12.5px] leading-snug text-text-secondary">
-        Start a private table and send the code. Empty seats are filled with bots. Private games never change your rating.
+        Start a private table and send the code. Add as many bots as you like when you start. Private games never change your rating.
       </p>
 
       {!signedIn ? (
@@ -55,13 +62,28 @@ export function PlayWithFriends({ signedIn }: { signedIn: boolean }) {
       ) : (
         <>
           <div className="mt-3 flex gap-1">
-            {(Object.keys(MODES) as ModeId[]).map((id) => (
+            {SPEEDS.map((sp) => (
               <button
-                key={id}
-                onClick={() => setMode(id)}
-                className={`flex-1 rounded-md py-1.5 text-[12px] transition ${id === mode ? "bg-white/10 font-medium" : "text-text-secondary hover:text-text-primary"}`}
+                key={sp.id}
+                onClick={() => setMode(sp.id)}
+                title={sp.blurb}
+                className={`flex-1 rounded-md py-1.5 text-[12px] transition ${sp.id === mode ? "bg-white/10 font-medium" : "text-text-secondary hover:text-text-primary"}`}
               >
-                {MODES[id].name}
+                {sp.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1.5 flex items-center gap-1 text-[12px]" role="radiogroup" aria-label="Table size">
+            <span className="mr-1 text-text-tertiary">Seats</span>
+            {SIZES.map((n) => (
+              <button
+                key={n}
+                role="radio"
+                aria-checked={n === seats}
+                onClick={() => setSeats(n)}
+                className={`h-7 w-7 rounded-md font-display text-[12px] font-semibold transition ${n === seats ? "bg-gold text-surface-primary" : "text-text-secondary hover:bg-white/5 hover:text-text-primary"}`}
+              >
+                {n}
               </button>
             ))}
           </div>
