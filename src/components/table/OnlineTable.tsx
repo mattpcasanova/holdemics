@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { PlayerTitle } from "@/components/ui/PlayerTitle";
@@ -29,6 +30,7 @@ interface OnlineTableProps {
 export function OnlineTable({ code, serverWs }: OnlineTableProps) {
   const { view, status, error, clearError, act, sit, stand, start, addBot, kick, unblock, setSeats, setMod, back } = useTableSocket(code, serverWs);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [dismissedResult, setDismissedResult] = useState(false);
 
@@ -246,7 +248,8 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
               achievements={myUserId ? view.achievements?.[myUserId] : undefined}
               onWatch={() => setDismissedResult(true)}
               onSkip={() => setDismissedResult(true)}
-              onPlayAgain={() => setDismissedResult(true)}
+              playAgainLabel={ranked && view.ratingChanges ? "Find another match" : undefined}
+              onPlayAgain={() => router.push(`/?queue=${view.config.mode}`)}
             />
           )}
         </main>

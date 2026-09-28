@@ -42,8 +42,6 @@ scripts/simulate.ts           # Bot-vs-bot sims for tuning blind speed and bot s
 design-reference/             # Original HTML mockups (6-max era; superseded)
 ```
 
-Legacy 6-max mock components still live in `src/components/*.tsx` and `src/lib/types.ts`; nothing imports them anymore and they can be deleted.
-
 ## Commands
 
 ```bash
@@ -88,6 +86,8 @@ node scripts/table-client.mjs CODE   # Scripted second player for two-human tabl
 - **Clocks and bots** run on a single Durable Object alarm (`state.due`); every transition persists to storage first. Clock expiry auto check/folds and sits the player out until they send `back`.
 - **Actions** carry `hand` and `step` (server transition counter) and are dropped if stale.
 - **Env**: `NEXT_PUBLIC_TABLE_SERVER_WS`, `TABLE_SERVER_URL`, `TABLE_SERVER_SECRET` (Next); `server/.dev.vars` holds the Worker's copy of the secret locally.
+- **Housekeeping**: a pg_cron job (`prune-stale-rows`, 04:17 UTC) deletes `tables` and `table_invites` rows older than a day via `private.prune_stale_rows()`; Durable Object state simply goes idle.
+- **Requeue**: the ranked result dialog's "Find another match" sends the player to `/?queue=<mode>`; the lobby selects that mode and `RankedButton` auto-joins once.
 
 ## Ranked Play
 

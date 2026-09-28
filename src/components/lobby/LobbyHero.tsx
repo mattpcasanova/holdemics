@@ -63,8 +63,8 @@ function MiniTable({ seats }: { seats: number }) {
   );
 }
 
-export function LobbyHero({ signedIn, serverWs }: { signedIn: boolean; serverWs: string | null }) {
-  const [modeId, setModeId] = useState<ModeId>("standard");
+export function LobbyHero({ signedIn, serverWs, queueMode = null }: { signedIn: boolean; serverWs: string | null; queueMode?: ModeId | null }) {
+  const [modeId, setModeId] = useState<ModeId>(queueMode ?? "standard");
   const mode = MODES[modeId];
 
   return (
@@ -115,7 +115,7 @@ export function LobbyHero({ signedIn, serverWs }: { signedIn: boolean; serverWs:
           </dl>
 
           <div className="mt-7 flex flex-wrap items-center gap-3">
-            <RankedButton mode={modeId} signedIn={signedIn} serverWs={serverWs} />
+            <RankedButton mode={modeId} signedIn={signedIn} serverWs={serverWs} autoJoin={queueMode === modeId} />
             <Link
               href={`/practice?mode=${modeId}&bots=medium`}
               className="whitespace-nowrap rounded-lg border border-border px-4 py-3 text-[14px] text-text-secondary transition hover:bg-white/5 hover:text-text-primary"

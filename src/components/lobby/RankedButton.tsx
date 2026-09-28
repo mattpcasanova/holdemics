@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueue } from "@/hooks/useQueue";
 import { type ModeId, MODES } from "@/lib/engine/modes";
 
@@ -9,6 +9,8 @@ interface RankedButtonProps {
   mode: ModeId;
   signedIn: boolean;
   serverWs: string | null;
+  /** Join the queue as soon as it mounts (arriving from "Find another match"). */
+  autoJoin?: boolean;
 }
 
 function useElapsed(since: number | null) {
@@ -22,10 +24,17 @@ function useElapsed(since: number | null) {
 }
 
 /** "Find a ranked match" with the live queue state, or a sign-in prompt for guests. */
-export function RankedButton({ mode, signedIn, serverWs }: RankedButtonProps) {
+export function RankedButton({ mode, signedIn, serverWs, autoJoin = false }: RankedButtonProps) {
   const { state, join, leave } = useQueue(serverWs);
   const elapsed = useElapsed(state.status === "searching" ? state.since : null);
   const seats = MODES[mode].seats;
+  const autoJoined = useRef(false);
+
+  useEffect(() => {
+    if (!autoJoin || autoJoined.current || !signedIn || state.status !== "idle") return;
+    autoJoined.current = true;
+    join(mode);
+  }, [autoJoin, signedIn, state.status, join, mode]);
 
   if (!signedIn) {
     return (

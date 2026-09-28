@@ -12,15 +12,16 @@ interface ResultOverlayProps {
   onWatch: () => void;
   onSkip: () => void;
   onPlayAgain: () => void;
-  /** Live table: no skipping ahead, and "play again" isn't offered. */
+  /** Live table: no skipping ahead; "play again" only when `playAgainLabel` is given (e.g. requeue). */
   online?: boolean;
+  playAgainLabel?: string;
   /** Ranked: the real change once the server has written it; undefined while pending. */
   ranked?: { change?: { before: number; after: number } };
   /** Achievement ids newly earned in this game. */
   achievements?: string[];
 }
 
-export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPlayAgain, online = false, ranked, achievements = [] }: ResultOverlayProps) {
+export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPlayAgain, online = false, playAgainLabel, ranked, achievements = [] }: ResultOverlayProps) {
   const hero = game.players[heroIndex];
   const place = hero.place ?? 1;
   const n = game.players.length;
@@ -110,12 +111,12 @@ export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPl
         )}
 
         <div className="mt-5 flex flex-col gap-2">
-          {finished && online ? null : finished ? (
+          {finished && online && !playAgainLabel ? null : finished ? (
             <button
               onClick={onPlayAgain}
               className="rounded-lg bg-gold py-2.5 font-display text-[14px] font-semibold text-surface-primary transition hover:brightness-110"
             >
-              Play again
+              {playAgainLabel ?? "Play again"}
             </button>
           ) : (
             <div className="flex gap-2">
