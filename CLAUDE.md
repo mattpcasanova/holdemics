@@ -159,4 +159,5 @@ HP tiers by effective BBs: >=25bb green, >=15bb gold, <15bb red. Sentence-case h
 - Anything rendered inside the sticky NavRail (or other stacking contexts) must portal modals to `document.body` — see SettingsDialog.
 - Tailwind v4 `translate-*` utilities use the CSS `translate` property, which stacks with an inline `transform: translate(...)`. Don't mix them on one element.
 - Player notes for bots are keyed by bot name (bots are regenerated each game); real players will key by user id.
+- **Auth email**: Supabase sends through custom SMTP (Resend, `smtp.resend.com:465`, user `resend`), which is required for custom templates. The sender is still `onboarding@resend.dev`, and Resend only delivers from it to the Resend account owner (mattpcasanova@gmail.com, no `+` aliases), so **real users can't get confirmation emails until a domain is verified in Resend** and the sender is switched to it. Template source: `supabase/templates/confirmation.html` (paste into Auth → Emails → Confirm sign up).
 - Below `lg` the table sidebar becomes a drawer (Standings button); below `md` the lobby swaps the nav rail for a top bar.
