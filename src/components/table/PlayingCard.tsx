@@ -19,6 +19,12 @@ const SUIT_NAME: Record<Suit, string> = { s: "spades", h: "hearts", d: "diamonds
 
 const FOUR_COLOR: Record<Suit, string> = { s: "#1A1D21", h: "#C8323A", d: "#2166C4", c: "#1E8A4C" };
 const TWO_COLOR: Record<Suit, string> = { s: "#1A1D21", h: "#C8323A", d: "#C8323A", c: "#1A1D21" };
+/**
+ * Folded or mucked cards: greyed and faded. A filter rather than opacity, because
+ * the deal animations fill `both` and would hold opacity at 1 after landing.
+ */
+const DIM_FILTER = "grayscale(1) brightness(0.6) opacity(0.5)";
+
 const FULL_BG: Record<Suit, string> = { s: "#262A31", h: "#C23B3B", d: "#2A67C9", c: "#23804A" };
 
 export function cardColors(suit: Suit, style: DeckStyle) {
@@ -73,8 +79,7 @@ export function PlayingCard({
         style={{
           width: s.w,
           height: s.h,
-          opacity: dimmed ? 0.35 : 1,
-          filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.4))",
+          filter: `drop-shadow(0 2px 4px rgba(0,0,0,0.4))${dimmed ? ` ${DIM_FILTER}` : ""}`,
           ...anim,
         }}
       >
@@ -97,12 +102,12 @@ export function PlayingCard({
         borderRadius: s.radius,
         background: bg,
         color: ink,
-        opacity: dimmed ? 0.45 : 1,
+        filter: dimmed ? DIM_FILTER : undefined,
         boxShadow: highlight
           ? "0 0 0 2px var(--gold), 0 6px 18px rgba(229,185,106,0.35)"
           : "0 2px 6px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(0,0,0,0.08)",
         transform: highlight ? "translateY(-4px)" : undefined,
-        transition: "transform 200ms, box-shadow 200ms",
+        transition: "transform 200ms, box-shadow 200ms, filter 300ms",
         ...anim,
       }}
     >

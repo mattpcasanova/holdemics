@@ -8,6 +8,7 @@ import { SoundToggle } from "@/components/ui/SoundToggle";
 import { HERO, usePracticeGame } from "@/hooks/usePracticeGame";
 import { type BotLevel, BOT_LEVELS } from "@/lib/engine/bots";
 import { potTotal } from "@/lib/engine/game";
+import { useUnlocks } from "@/lib/unlocks";
 import { type ModeId, MODES, blindsForLevel, describeLevelLength, formatHp } from "@/lib/engine/modes";
 import { ActionBar } from "./ActionBar";
 import { HandLog } from "./HandLog";
@@ -46,6 +47,7 @@ function PracticeTableInner({ mode, level, onResult, onPlayAgain }: PracticeTabl
     watch,
     skipToResults,
   } = usePracticeGame(mode, level);
+  const unlocks = useUnlocks();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Save the result once the hero's finishing place is known (knocked out, or the game ends).
@@ -149,6 +151,8 @@ function PracticeTableInner({ mode, level, onResult, onPlayAgain }: PracticeTabl
               heroSittingOut={sittingOut}
               fast={spectating}
               botLabel={`${BOT_LEVELS[level].name} bot`}
+              titles={game.players.map((_, i) => (i === HERO ? unlocks.title : null))}
+              avatars={game.players.map((_, i) => (i === HERO ? unlocks.avatar : null))}
             />
           </div>
           <div className="mx-auto w-full max-w-[880px] shrink-0">

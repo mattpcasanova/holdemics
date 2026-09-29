@@ -68,7 +68,9 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
         { label: "All in", to: max },
       ];
 
-  const size = clamp(raiseTo);
+  // While typing, size follows the draft so the button and Enter use what's in the box.
+  const typed = draft ? parseFloat(draft) : NaN;
+  const size = Number.isFinite(typed) ? clamp(typed * UNITS_PER_HP) : clamp(raiseTo);
   const raiseVerb = legal?.isBet ? "Bet" : "Raise to";
   const allIn = size >= max;
 
@@ -156,7 +158,7 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
               onChange={(e) => setSize(Number(e.target.value))}
               className="hx-range flex-1"
             />
-            <label className="flex items-center gap-1 rounded-md border border-border bg-surface-primary px-2 py-1 focus-within:border-gold/60">
+            <label className="flex items-baseline gap-1 rounded-md border border-gold/40 bg-gold/[0.07] px-2.5 py-0.5 focus-within:border-gold">
               <input
                 type="text"
                 inputMode="decimal"
@@ -174,9 +176,9 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
                     e.currentTarget.blur();
                   }
                 }}
-                className="w-14 bg-transparent text-right font-display text-[15px] font-semibold tabular-nums text-gold outline-none"
+                className="w-[72px] bg-transparent text-right font-display text-[22px] font-bold leading-tight tabular-nums text-gold outline-none"
               />
-              <span className="text-[11px] text-text-tertiary">HP</span>
+              <span className="text-[12px] font-medium text-gold/70">HP</span>
             </label>
           </div>
           <div className="text-[10px] text-text-tertiary max-sm:hidden">

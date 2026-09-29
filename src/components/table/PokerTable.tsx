@@ -356,7 +356,7 @@ export function PokerTable({
                   style={{ left: `${bet.x}%`, top: `${bet.y}%`, animation: "chip-in 260ms ease-out both" }}
                 >
                   <ChipStack amount={player.bet} scale={1.4} maxStacks={2} />
-                  <span className="rounded-md border border-white/10 bg-black/65 px-1.5 font-display text-[12px] font-semibold leading-[18px] tabular-nums text-text-primary shadow">
+                  <span className="rounded-md border border-gold/70 bg-black/85 px-2 font-display text-[19px] font-bold leading-[26px] tabular-nums text-white shadow-[0_2px_6px_rgba(0,0,0,0.5)]">
                     {formatHp(player.bet)}
                   </span>
                 </div>
