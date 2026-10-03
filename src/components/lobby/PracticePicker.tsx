@@ -6,6 +6,8 @@ import { TagIcon } from "@/components/ui/TagIcon";
 import { type BotLevel, BOT_LEVELS } from "@/lib/engine/bots";
 import { type ModeId, MODES } from "@/lib/engine/modes";
 import { type PlayerTag, PLAYER_TAGS } from "@/lib/notes";
+import { useActiveGame } from "@/lib/presence";
+import { InGameNotice } from "./InGameNotice";
 
 // Each level wears the player tag that describes how it plays.
 const LEVELS: { id: BotLevel; tag: PlayerTag; pips: number }[] = [
@@ -17,6 +19,7 @@ const LEVELS: { id: BotLevel; tag: PlayerTag; pips: number }[] = [
 export function PracticePicker() {
   const [level, setLevel] = useState<BotLevel>("medium");
   const [mode, setMode] = useState<ModeId>("standard");
+  const activeGame = useActiveGame();
 
   return (
     <section id="practice" aria-labelledby="practice-heading" className="scroll-mt-6">
@@ -80,12 +83,15 @@ export function PracticePicker() {
         </div>
         <Link
           href={`/practice?mode=${mode}&bots=${level}`}
-          className="rounded-lg bg-felt px-4 py-2 font-display text-[14px] font-semibold text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+          aria-disabled={!!activeGame}
+          onClick={(e) => activeGame && e.preventDefault()}
+          className="rounded-lg bg-felt px-4 py-2 aria-disabled:pointer-events-none aria-disabled:opacity-40 font-display text-[14px] font-semibold text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
         >
           Sit down with {MODES[mode].seats - 1} {BOT_LEVELS[level].name}
           {MODES[mode].seats - 1 === 1 ? "" : "s"}
         </Link>
       </div>
+      <InGameNotice className="mt-2" />
     </section>
   );
 }

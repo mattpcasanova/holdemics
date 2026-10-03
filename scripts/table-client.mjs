@@ -10,6 +10,7 @@
  *   node scripts/table-client.mjs --as friend --code ABC123 [--strategy call|shove] [--seconds 90]
  *   node scripts/table-client.mjs --as matt --queue headsup --strategy shove
  *   node scripts/table-client.mjs --as matt --queue headsup --noshow   (match, then never connect)
+ *   node scripts/table-client.mjs --as friend --queue headsup --leave-after 3   (disconnect after hand 3; logs away count)
  *   TABLE_WS=wss://<worker> node scripts/table-client.mjs …           (against a deployed Worker)
  */
 import { readFileSync } from "node:fs";
@@ -64,6 +65,10 @@ function queue(mode) {
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === "queued") log(`searching: ${msg.waiting} waiting, window ±${msg.window}`);
+      if (msg.type === "busy") {
+        log(`refused: still in a game at ${msg.code}`);
+        process.exit(0);
+      }
       if (msg.type === "matched") {
         log(`matched -> table ${msg.code}`);
         resolve(msg.code);
@@ -108,7 +113,12 @@ function playTable(code) {
       });
       if (g.handNumber !== lastHand) {
         lastHand = g.handNumber;
-        log(`hand ${g.handNumber}: my cards ${g.players[v.you]?.holeCards.map((c) => c.rank + c.suit).join(" ")}`);
+        log(`hand ${g.handNumber}: my cards ${g.players[v.you]?.holeCards.map((c) => c.rank + c.suit).join(" ")}${v.away ? ` (away ${v.away})` : ""}`);
+        if (args["leave-after"] && g.handNumber > Number(args["leave-after"])) {
+          log("leaving the table mid-game");
+          ws.close(1000, "left");
+          return resolve();
+        }
       }
       if (v.legal) {
         const key = `${g.handNumber}:${v.step}`;

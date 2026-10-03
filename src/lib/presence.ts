@@ -29,6 +29,15 @@ export interface Invite {
   mode: string;
 }
 
+/** The online game the player is still in, from `active_games` (set and cleared by the table server). */
+export interface ActiveGame {
+  code: string;
+  mode: string;
+  ranked: boolean;
+}
+
+const ACTIVE_GAME_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+
 export interface FriendNotice {
   id: string;
   kind: "request" | "accepted";
@@ -51,13 +60,7 @@ let friendNotices: FriendNotice[] = [];
 let friendsVersion = 0;
 let achievementNotices: string[] = [];
 const announced = new Set<string>();
-const ACTIVE_TABLE_KEY = "holdemics:activeTable";
-let activeTable: string | null = null;
-try {
-  activeTable = typeof window === "undefined" ? null : window.sessionStorage.getItem(ACTIVE_TABLE_KEY);
-} catch {
-  // Storage blocked: the "back to your table" pill just won't survive reloads.
-}
+let activeGame: ActiveGame | null = null;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
@@ -208,22 +211,15 @@ export function dismissAchievement(id: string) {
   notify();
 }
 
-/** The table the player has a game in progress at, so other pages can offer a way back. */
-export function setActiveTable(code: string | null) {
-  if (code === activeTable) return;
-  activeTable = code;
-  try {
-    if (code) window.sessionStorage.setItem(ACTIVE_TABLE_KEY, code);
-    else window.sessionStorage.removeItem(ACTIVE_TABLE_KEY);
-  } catch {
-    // Ignore; in-memory value still works for this page load.
-  }
+/** Re-read the signed-in player's active game. Called on navigation and when a table's state changes. */
+export async function refreshActiveGame(userId: string | null = me?.userId ?? feedUser) {
+  if (!userId) return;
+  const { data } = await supabase().from("active_games").select("table_code, mode, ranked, started_at").eq("user_id", userId).maybeSingle();
+  const live = data && Date.now() - new Date(data.started_at).getTime() < ACTIVE_GAME_MAX_AGE_MS;
+  const next = live ? { code: data.table_code as string, mode: data.mode as string, ranked: !!data.ranked } : null;
+  if (next?.code === activeGame?.code && next?.ranked === activeGame?.ranked) return;
+  activeGame = next;
   notify();
-}
-
-/** Forget the active table, but only if it's this one. */
-export function clearActiveTable(code: string) {
-  if (activeTable === code) setActiveTable(null);
 }
 
 const store = {
@@ -237,7 +233,7 @@ const store = {
   getFriendNotices: () => friendNotices,
   getFriendsVersion: () => friendsVersion,
   getAchievementNotices: () => achievementNotices,
-  getActiveTable: () => activeTable,
+  getActiveGame: () => activeGame,
 };
 const EMPTY_ONLINE: Record<string, PresenceEntry> = {};
 const EMPTY_INVITES: Invite[] = [];
@@ -273,8 +269,8 @@ export function useAchievementNotices(): string[] {
   return useSyncExternalStore(store.subscribe, store.getAchievementNotices, () => EMPTY_IDS);
 }
 
-export function useActiveTable(): string | null {
-  return useSyncExternalStore(store.subscribe, store.getActiveTable, () => null);
+export function useActiveGame(): ActiveGame | null {
+  return useSyncExternalStore(store.subscribe, store.getActiveGame, () => null);
 }
 
 export function describeWhere(where: Where): string {

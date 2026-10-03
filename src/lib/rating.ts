@@ -69,3 +69,27 @@ export function evenLobbyPayouts(players: number): number[] {
   const deltas = ratingChanges(entries);
   return entries.map((e) => deltas[e.id]);
 }
+
+/**
+ * Hands a player may spend away (disconnected or sitting out) in a ranked
+ * game before they lose any claim to the top half. Roughly 40% of a typical
+ * game: Standard runs ~33 hands, Turbo ~25, Heads-Up ~21.
+ */
+export function abandonHands(mode: ModeId): number {
+  return mode === "standard" ? 12 : mode === "turbo" ? 10 : 8;
+}
+
+/**
+ * Rated places after the away penalty: a player who was away too long can do
+ * no better than the first place in the bottom half (5th of 8, 2nd of 2).
+ * They drop just below that spot and everyone they passed moves up one.
+ */
+export function penalizeAbandoned<T extends { place: number; abandoned: boolean }>(entries: T[]): T[] {
+  const cap = Math.floor(entries.length / 2) + 1;
+  const byPlace = [...entries].sort((a, b) => a.place - b.place);
+  const demoted = byPlace.filter((e) => e.abandoned && e.place < cap);
+  const rest = byPlace.filter((e) => !demoted.includes(e));
+  // Everyone else keeps their order; the demoted block starts the bottom half.
+  const order = [...rest.slice(0, cap - 1), ...demoted, ...rest.slice(cap - 1)];
+  return entries.map((e) => ({ ...e, place: order.indexOf(e) + 1 }));
+}

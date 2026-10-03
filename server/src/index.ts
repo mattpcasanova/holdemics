@@ -1,8 +1,9 @@
+import { activeTableOf } from "./activeGames";
 import { identify } from "./auth";
 import { Queue } from "./queue";
 import { TableRoom } from "./table";
 import { MODES } from "@/lib/engine/modes";
-import type { CreateTableRequest } from "@/lib/realtime/protocol";
+import type { CreateTableRequest, QueueServerMessage } from "@/lib/realtime/protocol";
 
 export { Queue, TableRoom };
 
@@ -29,6 +30,15 @@ function json(body: unknown, status = 200) {
  *   GET  /tables/:code                                           — public summary (exists, phase, seats)
  *   GET  /queue/:mode/ws?token=<supabase jwt>                    — ranked matchmaking WebSocket
  */
+/** Accept a socket just long enough to say why, then close it (browsers can't read a refused upgrade's body). */
+function refuseSocket(msg: QueueServerMessage): Response {
+  const [client, server] = Object.values(new WebSocketPair());
+  server.accept();
+  server.send(JSON.stringify(msg));
+  server.close(4423, msg.type);
+  return new Response(null, { status: 101, webSocket: client });
+}
+
 function originAllowed(origin: string | null, env: Env): boolean {
   if (!origin) return true; // non-browser clients (test scripts) send no Origin
   return env.ALLOWED_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean).includes(origin);
@@ -48,6 +58,9 @@ export default {
       const token = url.searchParams.get("token") ?? "";
       const who = token ? await identify(token, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY) : null;
       if (!who || who.anonymous) return json({ error: "Sign in to play ranked" }, 401);
+      // One game at a time: someone still in a game can't queue for another.
+      const busyAt = await activeTableOf(env, who.userId);
+      if (busyAt) return refuseSocket({ type: "busy", code: busyAt });
       const rating = await fetch(`${env.SUPABASE_URL}/rest/v1/ratings?user_id=eq.${who.userId}&mode=eq.${mode}&select=rating,games`, {
         headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` },
       })
@@ -92,6 +105,10 @@ export default {
       forward.headers.set("X-Username", who.username);
       if (who.title) forward.headers.set("X-Title", who.title);
       forward.headers.set("X-Avatar", who.avatar);
+      // The room won't seat someone who's mid-game at another table (they can still watch).
+      const busyAt = await activeTableOf(env, who.userId);
+      if (busyAt && busyAt !== code) forward.headers.set("X-Busy-At", busyAt);
+      forward.headers.set("X-Table-Code", code);
       return room.fetch(forward);
     }
 

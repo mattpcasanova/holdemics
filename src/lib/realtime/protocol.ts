@@ -93,6 +93,10 @@ export interface TableView {
   cancelled?: string;
   /** Achievements newly earned in this game, keyed by user id. */
   achievements?: Record<string, string[]>;
+  /** Ranked: hands the viewer has spent away (disconnected or sitting out) this game. */
+  away?: number;
+  /** Ranked: players who were away too long to keep a top-half finish (user ids). */
+  penalized?: string[];
 }
 
 export type ClientMessage =
@@ -129,4 +133,6 @@ export type QueueClientMessage = { type: "leave" } | { type: "ping" };
 export type QueueServerMessage =
   | { type: "queued"; waiting: number; since: number; window: number }
   | { type: "matched"; code: string }
+  /** Refused: the player still has a game running at this table. */
+  | { type: "busy"; code: string }
   | { type: "pong" };

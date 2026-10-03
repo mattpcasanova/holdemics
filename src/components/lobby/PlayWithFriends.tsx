@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { BotLevel } from "@/lib/engine/bots";
 import { MAX_SEATS, type ModeId } from "@/lib/engine/modes";
+import { useActiveGame } from "@/lib/presence";
+import { InGameNotice } from "./InGameNotice";
 
 const SPEEDS: { id: ModeId; label: string; blurb: string }[] = [
   { id: "standard", label: "Standard", blurb: "Blinds up every orbit" },
@@ -21,6 +23,7 @@ export function PlayWithFriends({ signedIn }: { signedIn: boolean }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const activeGame = useActiveGame();
 
   const create = async () => {
     setBusy(true);
@@ -89,11 +92,12 @@ export function PlayWithFriends({ signedIn }: { signedIn: boolean }) {
           </div>
           <button
             onClick={create}
-            disabled={busy}
+            disabled={busy || !!activeGame}
             className="mt-2.5 w-full rounded-lg bg-gold py-2 font-display text-[13px] font-semibold text-surface-primary transition hover:brightness-110 disabled:opacity-60"
           >
             {busy ? "Creating table" : "Create table"}
           </button>
+          <InGameNotice className="mt-1.5" />
           <form onSubmit={join} className="mt-3 flex gap-1.5">
             <input
               value={code}

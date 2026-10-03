@@ -16,7 +16,7 @@ interface ResultOverlayProps {
   online?: boolean;
   playAgainLabel?: string;
   /** Ranked: the real change once the server has written it; undefined while pending. */
-  ranked?: { change?: { before: number; after: number } };
+  ranked?: { change?: { before: number; after: number }; penalized?: boolean };
   /** Achievement ids newly earned in this game. */
   achievements?: string[];
 }
@@ -72,7 +72,11 @@ export function ResultOverlay({ game, heroIndex, finished, onWatch, onSkip, onPl
                 <span className="text-[13px] text-text-tertiary">{finished ? "Updating…" : "Set when the game ends"}</span>
               )}
             </div>
-          ) : (
+          ) : null}
+          {ranked?.penalized && (
+            <p className="mt-1 text-[11.5px] leading-snug text-[#EFA3A3]">You were away too many hands, so this counts as a bottom-half finish for your rating.</p>
+          )}
+          {ranked ? null : (
             <>
               <div className="flex items-baseline justify-between">
                 <span className="text-[12px] text-text-secondary">Rating change</span>

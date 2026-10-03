@@ -12,9 +12,10 @@ import { useTableSocket } from "@/hooks/useTableSocket";
 import { type BotLevel, BOT_LEVELS } from "@/lib/engine/bots";
 import { potTotal } from "@/lib/engine/game";
 import { MAX_SEATS, MODES, blindsForLevel, describeLevelLength, formatHp } from "@/lib/engine/modes";
+import { abandonHands } from "@/lib/rating";
 import { type StatsTable, accumulateHand } from "@/lib/stats";
 import { InviteFriends } from "@/components/friends/InviteFriends";
-import { announceAchievements, clearActiveTable, sendInvite, setActiveTable } from "@/lib/presence";
+import { announceAchievements, refreshActiveGame, sendInvite } from "@/lib/presence";
 import type { SeatView, TableView } from "@/lib/realtime/protocol";
 import { ACTION_BAR_SLOT, ActionBar } from "./ActionBar";
 import { HandLog } from "./HandLog";
@@ -49,13 +50,13 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
     if (myAchievements?.length) announceAchievements(code, myAchievements);
   }, [code, myAchievements]);
 
-  // While we're still in a game here, other pages show a way back.
+  // The server records when we start and stop being in a game here; re-read it shortly after
+  // either happens so the rest of the app (rejoin banner, lobby buttons) agrees.
   const stillPlaying = !!view && view.phase === "playing" && view.you !== null && !view.game?.players[view.you]?.eliminated;
   useEffect(() => {
-    if (!view) return;
-    if (stillPlaying) setActiveTable(code);
-    else clearActiveTable(code);
-  }, [code, view, stillPlaying]);
+    const t = setTimeout(() => void refreshActiveGame(), 1500);
+    return () => clearTimeout(t);
+  }, [stillPlaying]);
 
   if (status === "unauthorized") return <Notice title="Sign in to join this table" link={{ href: `/login?next=/table/${code}`, label: "Sign in" }} />;
   if (status === "missing") return <Notice title="This table doesn't exist" body="Check the code with whoever sent it." link={{ href: "/", label: "Back to lobby" }} />;
@@ -233,7 +234,13 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
               <div className="flex h-full items-center justify-between gap-3 rounded-xl border border-gold/50 bg-gold/[0.07] px-4">
                 <div>
                   <div className="font-display text-[15px] font-semibold text-gold">You&apos;re sitting out</div>
-                  <div className="text-[12px] text-text-secondary">Your clock ran out. Until you return, you check when you can and fold to bets.</div>
+                  <div className="text-[12px] text-text-secondary">
+                    {ranked && view.away !== undefined
+                      ? view.away >= abandonHands(view.config.mode)
+                        ? `Away ${view.away} hands: you can no longer finish in the top half. You check when you can and fold to bets.`
+                        : `Away ${view.away} of ${abandonHands(view.config.mode)} hands. Any more and you can't finish in the top half.`
+                      : "Your clock ran out. Until you return, you check when you can and fold to bets."}
+                  </div>
                 </div>
                 <button onClick={back} className="shrink-0 rounded-lg bg-gold px-4 py-2.5 font-display text-[14px] font-semibold text-surface-primary transition hover:brightness-110">
                   I&apos;m back
@@ -258,7 +265,7 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
               heroIndex={hero}
               finished={view.phase === "finished"}
               online
-              ranked={ranked ? { change: myUserId ? view.ratingChanges?.[myUserId] : undefined } : undefined}
+              ranked={ranked ? { change: myUserId ? view.ratingChanges?.[myUserId] : undefined, penalized: !!myUserId && !!view.penalized?.includes(myUserId) } : undefined}
               achievements={myUserId ? view.achievements?.[myUserId] : undefined}
               onWatch={() => setDismissedResult(true)}
               onSkip={() => setDismissedResult(true)}

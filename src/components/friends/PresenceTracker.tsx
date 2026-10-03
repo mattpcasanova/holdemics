@@ -10,6 +10,7 @@ import { RARITY } from "@/lib/cosmetics";
 import { type ModeId, MODES } from "@/lib/engine/modes";
 import { equipReward, isEquipped } from "@/lib/equip";
 import {
+  type ActiveGame,
   type FriendNotice,
   type Where,
   answerFriendRequest,
@@ -18,7 +19,8 @@ import {
   dismissInvite,
   trackPresence,
   useAchievementNotices,
-  useActiveTable,
+  refreshActiveGame,
+  useActiveGame,
   useFriendNotices,
   useInvites,
 } from "@/lib/presence";
@@ -55,11 +57,21 @@ export function PresenceTracker({ userId, username }: { userId: string; username
   const pathname = usePathname();
   const invites = useInvites();
   const achievements = useAchievementNotices();
-  const activeTable = useActiveTable();
+  const activeGame = useActiveGame();
   const inGame = pathname.startsWith("/table/") || pathname.startsWith("/practice");
   // The Friends page already lists incoming requests, so don't toast them there.
   const notices = useFriendNotices().filter((n) => !(n.kind === "request" && pathname === "/friends"));
-  const awayFromTable = activeTable && !pathname.toUpperCase().startsWith(`/TABLE/${activeTable}`);
+  const awayFromTable = activeGame && !pathname.toUpperCase().startsWith(`/TABLE/${activeGame.code}`);
+
+  // Check for an unfinished game on every page and whenever the tab comes back into focus.
+  useEffect(() => {
+    void refreshActiveGame(userId);
+  }, [pathname, userId]);
+  useEffect(() => {
+    const onFocus = () => void refreshActiveGame(userId);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [userId]);
 
   useEffect(() => {
     const table = pathname.match(/^\/table\/([A-Z0-9]+)/i);
@@ -67,21 +79,11 @@ export function PresenceTracker({ userId, username }: { userId: string; username
     void trackPresence({ userId, username, where });
   }, [pathname, userId, username]);
 
-  if (!invites.length && !notices.length && !achievements.length && !awayFromTable) return null;
   // At a table the action buttons sit along the bottom, so notices drop in at the top instead.
   const placement = inGame ? "inset-x-4 top-3 items-center" : "bottom-4 right-4 items-end max-md:bottom-[calc(76px+env(safe-area-inset-bottom))] max-sm:left-4 max-sm:items-stretch";
-  return (
+  const hasToasts = invites.length > 0 || notices.length > 0 || achievements.length > 0;
+  const toasts = hasToasts && (
     <div className={`pointer-events-none fixed z-[120] flex flex-col gap-2 [&>*]:pointer-events-auto ${placement}`}>
-      {awayFromTable && (
-        <Link
-          href={`/table/${activeTable}`}
-          className="flex items-center gap-2 self-center rounded-full border border-felt bg-felt px-4 py-2 font-display text-[13.5px] font-semibold text-white shadow-2xl hover:brightness-110"
-          style={pop}
-        >
-          <span className="h-2 w-2 animate-pulse rounded-full bg-white" aria-hidden />
-          Back to your table
-        </Link>
-      )}
       {achievements.map((id) => (
         <AchievementToast key={id} id={id} />
       ))}
@@ -109,6 +111,33 @@ export function PresenceTracker({ userId, username }: { userId: string; username
         </div>
       ))}
     </div>
+  );
+
+  return (
+    <>
+      {awayFromTable && <RejoinBanner game={activeGame} />}
+      {toasts}
+    </>
+  );
+}
+
+/** Full-width bar on every page while the player has an unfinished game elsewhere. */
+function RejoinBanner({ game }: { game: ActiveGame }) {
+  const mode = MODES[game.mode as ModeId]?.name ?? game.mode;
+  return (
+    <Link
+      href={`/table/${game.code}`}
+      className="sticky top-0 z-[60] flex items-center justify-center gap-3 bg-felt px-4 py-2.5 text-white shadow-lg hover:brightness-110"
+    >
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+      </span>
+      <span className="text-[13.5px]">
+        {`You're still in a ${game.ranked ? "ranked " : ""}${mode} game. Your hands are being folded while you're away.`}
+      </span>
+      <span className="shrink-0 rounded-md bg-white px-3 py-1 font-display text-[13px] font-semibold text-felt">Rejoin</span>
+    </Link>
   );
 }
 

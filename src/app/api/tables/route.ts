@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { BOT_LEVELS, type BotLevel } from "@/lib/engine/bots";
 import { MAX_SEATS, MODES, type ModeId } from "@/lib/engine/modes";
 import type { CreateTableRequest } from "@/lib/realtime/protocol";
+import { getActiveGame } from "@/lib/activeGame";
 import { createClient, getViewer } from "@/lib/supabase/server";
 
 /** Unambiguous characters only: no 0/O or 1/I. */
@@ -16,6 +17,7 @@ function newCode(): string {
 export async function POST(request: Request) {
   const viewer = await getViewer();
   if (!viewer) return NextResponse.json({ error: "Sign in to create a table." }, { status: 401 });
+  if (await getActiveGame(viewer.id)) return NextResponse.json({ error: "You're still in a game. Finish it before starting another." }, { status: 409 });
 
   const body = (await request.json().catch(() => null)) as { mode?: string; botLevel?: string; seats?: number } | null;
   const mode = body?.mode as ModeId;

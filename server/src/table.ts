@@ -23,7 +23,8 @@ import type {
   TableView,
 } from "@/lib/realtime/protocol";
 import { redactGame } from "@/lib/realtime/view";
-import { ratingChanges } from "@/lib/rating";
+import { abandonHands, penalizeAbandoned, ratingChanges } from "@/lib/rating";
+import { syncActiveGames } from "./activeGames";
 import {
   type CareerTotals,
   type GameFacts,
@@ -91,6 +92,9 @@ interface TableState {
   /** Removed by the host; can't sit again until unblocked. */
   blocked?: { userId: string; name: string }[];
   achievements?: Record<string, string[]>;
+  /** Ranked: places used for rating after the away penalty, by user id. */
+  ratedPlaces?: Record<string, number>;
+  penalized?: string[];
 }
 
 /** What we track per seat during a game; turned into GameFacts at the end. */
@@ -114,6 +118,8 @@ interface SeatFacts {
   worstBeat?: number | null;
   /** Achievement ids already sent for this seat during the game. */
   awarded?: string[];
+  /** Hands dealt while disconnected or sitting out. */
+  awayHands?: number;
 }
 
 const freshFacts = (): SeatFacts => ({
@@ -134,6 +140,7 @@ const freshFacts = (): SeatFacts => ({
   bestSuckout: null,
   worstBeat: null,
   awarded: [],
+  awayHands: 0,
 });
 
 type Award = { user_id: string; achievement_id: string; reward_kind: string; reward_id: string };
@@ -146,6 +153,8 @@ interface Attachment {
   username: string;
   title: string | null;
   avatar: string;
+  /** Code of another table where this player has a game running; they can watch here but not sit. */
+  busyAt?: string | null;
 }
 
 const PACE = { botMin: 650, botMax: 1500, handEnd: 1600, showdownEnd: 3200, firstDeal: 900 };
@@ -205,12 +214,19 @@ export class TableRoom extends DurableObject<Env> {
     }
 
     if (path === "/ws") {
-      if (!this.state) return Response.json({ error: "No such table" }, { status: 404 });
+      if (!this.state) {
+        // A game recorded here can't be resumed if the table is gone; free the player instead of stranding them.
+        const code = request.headers.get("X-Table-Code");
+        const userId = request.headers.get("X-User-Id");
+        if (code && userId) this.background(syncActiveGames(this.env, "clear", [userId], { code }));
+        return Response.json({ error: "No such table" }, { status: 404 });
+      }
       const attachment: Attachment = {
         userId: request.headers.get("X-User-Id")!,
         username: request.headers.get("X-Username")!,
         title: request.headers.get("X-Title") || null,
         avatar: request.headers.get("X-Avatar") || "initials",
+        busyAt: request.headers.get("X-Busy-At"),
       };
       // Ranked tables are for the matched players only.
       if (this.state.config.ranked && !this.state.seats.some((s) => s.userId === attachment.userId)) {
@@ -225,6 +241,9 @@ export class TableRoom extends DurableObject<Env> {
         this.startGame();
         await this.save();
       }
+      // Their game here is over (busted or finished): make sure they're free to play elsewhere.
+      const mine = this.state.seats.findIndex((x) => x.userId === attachment.userId);
+      if (this.state.phase === "finished" || (mine >= 0 && this.state.game?.players[mine]?.eliminated)) this.clearActive([attachment.userId]);
       // A returning player keeps their seat; just refresh everyone's view.
       this.broadcast();
       return new Response(null, { status: 101, webSocket: client });
@@ -253,6 +272,7 @@ export class TableRoom extends DurableObject<Env> {
       case "sit":
         if (this.state.config.ranked) return;
         if (this.state.blocked?.some((b) => b.userId === who.userId)) return this.send(ws, { type: "error", message: "The host removed you from this table. You'll need a new invite to sit." });
+        if (who.busyAt) return this.send(ws, { type: "error", message: `You're still in a game at table ${who.busyAt}. Finish it before sitting down here.` });
         this.sit(who);
         break;
       case "stand":
@@ -262,6 +282,10 @@ export class TableRoom extends DurableObject<Env> {
       case "start":
         if (this.state.config.ranked) return;
         if (!this.isHost(who)) return this.send(ws, { type: "error", message: "Only the host can start the game." });
+        {
+          const busy = await this.busyElsewhere();
+          if (busy) return this.send(ws, { type: "error", message: `${busy} is still in another game. They need to finish it first.` });
+        }
         if (!this.startGame()) return this.send(ws, { type: "error", message: "A game needs at least two players. Add a bot or wait for a friend." });
         break;
       case "addBot": {
@@ -364,6 +388,7 @@ export class TableRoom extends DurableObject<Env> {
       if (s.phase === "lobby") {
         s.phase = "finished";
         s.cancelled = "A player didn't show up, so the match was called off. No rating change.";
+        this.clearActive(null);
         await this.save();
         this.broadcast();
       }
@@ -460,10 +485,37 @@ export class TableRoom extends DurableObject<Env> {
     s.facts = Object.fromEntries(s.seats.map((_, i) => [i, freshFacts()]));
     // Achievements accumulate over a game (some arrive mid-game), so start each game clean.
     s.achievements = undefined;
+    s.ratedPlaces = undefined;
+    s.penalized = undefined;
     s.phase = "playing";
     s.step++;
     s.due = { kind: "deal", at: Date.now() + PACE.firstDeal };
+    const humans = s.seats.flatMap((x) => (x.userId ? [x.userId] : []));
+    this.background(syncActiveGames(this.env, "set", humans, { code: s.config.code, mode: s.config.mode, ranked: !!s.config.ranked }));
     return true;
+  }
+
+  /** Name of a seated player who has a game running at another table, if any. */
+  private async busyElsewhere(): Promise<string | null> {
+    const s = this.state!;
+    const humans = s.seats.filter((x) => x.userId);
+    try {
+      const live = await syncActiveGames(this.env, "get", humans.map((x) => x.userId!));
+      return humans.find((x) => live[x.userId!] && live[x.userId!] !== s.config.code)?.name ?? null;
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  }
+
+  /** Free these players (all players here when null) to start another game. */
+  private clearActive(users: string[] | null) {
+    this.background(syncActiveGames(this.env, "clear", users, { code: this.state!.config.code }));
+  }
+
+  /** Keep the object alive for I/O that shouldn't hold up the game. */
+  private background(work: Promise<unknown>) {
+    this.ctx.waitUntil(work.catch((err) => console.error(err)));
   }
 
   // ─── Game transitions ────────────────────────────────────
@@ -517,6 +569,7 @@ export class TableRoom extends DurableObject<Env> {
     if (g.phase === "finished") {
       s.phase = "finished";
       s.due = null;
+      this.clearActive(null);
       if (s.config.ranked) this.pendingRanked = this.recordRanked(g);
       else if (!s.seats.some((x) => x.isBot)) this.pendingRanked = this.awardGameAchievements(g, {});
       return;
@@ -547,10 +600,17 @@ export class TableRoom extends DurableObject<Env> {
   private async recordRanked(g: GameState) {
     const s = this.state!;
     const players = s.config.players ?? [];
-    const entries = players.map((p) => {
-      const seat = s.seats.findIndex((x) => x.userId === p.userId);
-      return { id: p.userId, rating: p.rating, gamesPlayed: p.games, place: g.players[seat]?.place ?? players.length };
-    });
+    const limit = abandonHands(s.config.mode);
+    // Away too long: no top-half finish for rating, whatever the chips say.
+    const entries = penalizeAbandoned(
+      players.map((p) => {
+        const seat = s.seats.findIndex((x) => x.userId === p.userId);
+        const abandoned = (s.facts?.[seat]?.awayHands ?? 0) >= limit;
+        return { id: p.userId, rating: p.rating, gamesPlayed: p.games, place: g.players[seat]?.place ?? players.length, abandoned };
+      }),
+    );
+    s.ratedPlaces = Object.fromEntries(entries.map((e) => [e.id, e.place]));
+    s.penalized = entries.filter((e) => e.abandoned && e.place !== (g.players[s.seats.findIndex((x) => x.userId === e.id)]?.place ?? e.place)).map((e) => e.id);
     const deltas = ratingChanges(entries, s.config.mode);
     const changes: Record<string, { before: number; after: number }> = {};
     for (const e of entries) changes[e.id] = { before: e.rating, after: e.rating + (deltas[e.id] ?? 0) };
@@ -609,6 +669,8 @@ export class TableRoom extends DurableObject<Env> {
     g.players.forEach((p, i) => {
       const f = facts[i];
       if (!f || p.eliminated) return;
+      const seat = this.state!.seats[i];
+      if (seat?.userId && (seat.sittingOut || !this.isConnected(seat.userId))) f.awayHands = (f.awayHands ?? 0) + 1;
       f.minStack = Math.min(f.minStack, held(p));
       const soleLeader = held(p) === top && leaders === 1;
       if (alive.length <= 4 && !soleLeader) f.ledFromFinalFour = false;
@@ -625,6 +687,9 @@ export class TableRoom extends DurableObject<Env> {
     const payouts = Object.entries(r.payouts).map(([i, amt]) => ({ i: Number(i), amt }));
     const biggestWinner = payouts.sort((a, b) => b.amt - a.amt)[0]?.i;
     if (biggestWinner !== undefined && facts[biggestWinner]) facts[biggestWinner].knockouts += r.busted.length;
+    // Busted players are free to queue again while the rest play on.
+    const bustedUsers = r.busted.flatMap((i) => (this.state!.seats[i]?.userId ? [this.state!.seats[i].userId!] : []));
+    if (bustedUsers.length && g.phase !== "finished") this.clearActive(bustedUsers);
     if (r.showdown) {
       for (const [i, hand] of Object.entries(r.hands)) {
         const seat = Number(i);
@@ -705,7 +770,7 @@ export class TableRoom extends DurableObject<Env> {
       }
       f.awarded = [...sent];
     });
-    if (awards.length) void this.sendAwards(awards);
+    if (awards.length) this.background(this.sendAwards(awards));
   }
 
   private toAward(userId: string, id: string): Award | null {
@@ -721,7 +786,7 @@ export class TableRoom extends DurableObject<Env> {
     const awards: Award[] = [];
     s.seats.forEach((seat, i) => {
       if (!seat.userId || !s.facts![i]) return;
-      const ids = new Set(gameAchievements(this.gameFacts(g, i, g.players[i].place ?? s.seats.length)));
+      const ids = new Set(gameAchievements(this.gameFacts(g, i, s.ratedPlaces?.[seat.userId] ?? g.players[i].place ?? s.seats.length)));
       const t = totals[seat.userId];
       if (t) for (const id of milestoneAchievements(t, s.config.mode)) ids.add(id);
       const c = career[seat.userId];
@@ -837,6 +902,8 @@ export class TableRoom extends DurableObject<Env> {
       ratingChanges: s.ratingChanges,
       cancelled: s.cancelled,
       achievements: s.achievements,
+      away: viewer !== null && s.config.ranked ? (s.facts?.[viewer]?.awayHands ?? 0) : undefined,
+      penalized: s.penalized,
     };
   }
 

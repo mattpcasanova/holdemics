@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useQueue } from "@/hooks/useQueue";
 import { type ModeId, MODES } from "@/lib/engine/modes";
+import { useActiveGame } from "@/lib/presence";
 
 interface RankedButtonProps {
   mode: ModeId;
@@ -29,12 +30,14 @@ export function RankedButton({ mode, signedIn, serverWs, autoJoin = false }: Ran
   const elapsed = useElapsed(state.status === "searching" ? state.since : null);
   const seats = MODES[mode].seats;
   const autoJoined = useRef(false);
+  const activeGame = useActiveGame();
+  const busyAt = activeGame?.code ?? (state.status === "busy" ? state.code : null);
 
   useEffect(() => {
-    if (!autoJoin || autoJoined.current || !signedIn || state.status !== "idle") return;
+    if (!autoJoin || autoJoined.current || !signedIn || busyAt || state.status !== "idle") return;
     autoJoined.current = true;
     join(mode);
-  }, [autoJoin, signedIn, state.status, join, mode]);
+  }, [autoJoin, signedIn, busyAt, state.status, join, mode]);
 
   if (!signedIn) {
     return (
@@ -44,6 +47,25 @@ export function RankedButton({ mode, signedIn, serverWs, autoJoin = false }: Ran
       >
         Sign in to play ranked
       </Link>
+    );
+  }
+
+  // One game at a time: while one is running, the big button takes you back to it.
+  if (busyAt && state.status !== "matched") {
+    return (
+      <div className="flex flex-col gap-1">
+        <Link
+          href={`/table/${busyAt}`}
+          className="flex items-center gap-2.5 rounded-lg bg-felt px-5 py-3 font-display text-[15px] font-semibold text-white transition hover:brightness-110"
+        >
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+          </span>
+          Rejoin your game
+        </Link>
+        <span className="text-[12px] text-text-secondary">You&apos;re still in a game. Finish it before starting another.</span>
+      </div>
     );
   }
 
