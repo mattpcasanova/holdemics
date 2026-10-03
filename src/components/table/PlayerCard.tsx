@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { PlayerTitle } from "@/components/ui/PlayerTitle";
+import { RankedStatTiles } from "@/components/ui/RankedStatTiles";
 import { TagIcon } from "@/components/ui/TagIcon";
 import type { PlayerState } from "@/lib/engine/game";
-import { formatHp } from "@/lib/engine/modes";
+import { type ModeId, MODES, formatHp } from "@/lib/engine/modes";
+import { type RankedSummary, EMPTY_SUMMARY, fetchRankedSummaries } from "@/lib/rankedStats";
+import { createClient } from "@/lib/supabase/client";
+import { useUnlocks } from "@/lib/unlocks";
 import { PLAYER_TAGS, TAG_ORDER, noteKey, saveNote, useNotes } from "@/lib/notes";
 import { type PlayerStats, EMPTY_STATS, aggressionFactor, pct } from "@/lib/stats";
 
@@ -18,7 +22,33 @@ interface PlayerCardProps {
   /** Selected profile title id. */
   title?: string | null;
   avatar?: string | null;
+  /** The table's mode, whose ranked record the card shows. */
+  mode: ModeId;
   onClose: () => void;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Records barely change during a session, so fetch each player's once.
+const records = new Map<string, Promise<RankedSummary>>();
+
+/** A real player's career ranked record in `mode`; null for bots and guests, undefined while loading. */
+function useRankedRecord(playerId: string, mode: ModeId, isBot: boolean): RankedSummary | null | undefined {
+  const real = !isBot && UUID.test(playerId);
+  const [state, setState] = useState<{ key: string; summary: RankedSummary } | null>(null);
+  const key = `${playerId}:${mode}`;
+  useEffect(() => {
+    if (!real) return;
+    let live = true;
+    if (!records.has(key)) {
+      records.set(key, fetchRankedSummaries(createClient(), [playerId], mode).then((r) => r[playerId]?.[mode] ?? EMPTY_SUMMARY));
+    }
+    void records.get(key)!.then((summary) => live && setState({ key, summary }));
+    return () => {
+      live = false;
+    };
+  }, [real, key, playerId, mode]);
+  if (!real) return null;
+  return state?.key === key ? state.summary : undefined;
 }
 
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
@@ -30,8 +60,12 @@ function Stat({ label, value, hint }: { label: string; value: string; hint: stri
   );
 }
 
-export function PlayerCard({ player, isHero, stats = EMPTY_STATS, botLabel, title, avatar, onClose }: PlayerCardProps) {
+export function PlayerCard({ player, isHero, stats = EMPTY_STATS, botLabel, title, avatar, mode, onClose }: PlayerCardProps) {
   const notes = useNotes();
+  // Practice seats aren't tied to accounts, but your own seat is always you.
+  const me = useUnlocks();
+  const record = useRankedRecord(isHero && me.userId ? me.userId : player.id, mode, player.isBot);
+  const profileName = isHero && me.username ? me.username : player.name;
   const key = noteKey(player);
   const note = notes[key];
 
@@ -85,16 +119,26 @@ export function PlayerCard({ player, isHero, stats = EMPTY_STATS, botLabel, titl
         <Stat label="Pots won" value={String(stats.handsWon)} hint="Hands won" />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-1.5 text-[12px]">
-        <div className="rounded-lg border border-border px-2 py-1.5">
-          <div className="text-text-tertiary">Rating trend</div>
-          <div className="text-text-secondary">{botLabel ? "Bots are unrated" : "After ranked games"}</div>
-        </div>
-        <div className="rounded-lg border border-border px-2 py-1.5">
-          <div className="text-text-tertiary">Played together</div>
-          <div className="text-text-secondary">{botLabel ? "Bots only" : "With accounts"}</div>
-        </div>
+      <div className="mt-3 flex items-baseline justify-between">
+        <h3 className="text-[12px] font-medium text-text-secondary">Ranked {MODES[mode].name}</h3>
+        {record !== null && (
+          // A new tab, so checking a profile never pulls you away from the table.
+          <a href={`/u/${encodeURIComponent(profileName)}`} target="_blank" rel="noopener" className="text-[11px] text-text-tertiary hover:text-gold">
+            Profile ↗
+          </a>
+        )}
       </div>
+      {record === null ? (
+        <p className="mt-1 text-[12px] text-text-tertiary">{botLabel ? "Bots are unrated." : "No ranked record."}</p>
+      ) : record === undefined ? (
+        <div className="mt-1.5 h-[46px] animate-pulse rounded-lg bg-surface-deep" />
+      ) : record.games === 0 ? (
+        <p className="mt-1 text-[12px] text-text-tertiary">No ranked {MODES[mode].name} games yet.</p>
+      ) : (
+        <div className="mt-1.5">
+          <RankedStatTiles summary={record} mode={mode} compact />
+        </div>
+      )}
 
       {!isHero && (
         <>

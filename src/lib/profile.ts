@@ -1,4 +1,5 @@
 import type { ModeId } from "./engine/modes";
+import { type RankedSummary, EMPTY_SUMMARY, fetchRankedSummaries } from "./rankedStats";
 import { createClient } from "./supabase/server";
 
 /** Everything public about one player, for /u/<username>. */
@@ -18,11 +19,8 @@ export interface ModeSummary {
   /** Ranked games in this mode (from the ratings row, which counts placement games too). */
   games: number;
   rank: number | null;
-  wins: number;
-  /** Average finishing place, null before any games. */
-  avgPlace: number | null;
-  /** Share of games finished in the top half (same cut as the lobby's recent games). */
-  topHalfRate: number | null;
+  /** Career ranked record (all games, not just the recent ones loaded for the trend). */
+  record: RankedSummary;
   /** Rating before the first of the recent games, then after each; oldest first. */
   trend: number[];
 }
@@ -110,6 +108,7 @@ export async function getProfile(username: string, viewerId: string | null): Pro
     playedAt: g.played_at,
   }));
 
+  const records = (await fetchRankedSummaries(supabase, [id]))[id] ?? {};
   const ratingRows = (ratings.data ?? []) as { mode: ModeId; rating: number; peak: number; games: number }[];
   const modes = await Promise.all(
     MODE_ORDER.map(async (mode): Promise<ModeSummary> => {
@@ -124,9 +123,7 @@ export async function getProfile(username: string, viewerId: string | null): Pro
         peak: row.peak,
         games: row.games,
         rank,
-        wins: mine.filter((g) => g.place === 1).length,
-        avgPlace: mine.length ? mine.reduce((sum, g) => sum + g.place, 0) / mine.length : null,
-        topHalfRate: mine.length ? mine.filter((g) => g.place <= Math.floor(g.players / 2)).length / mine.length : null,
+        record: records[mode] ?? EMPTY_SUMMARY,
         trend: recentFirst.length ? [recentFirst[0].ratingBefore, ...recentFirst.map((g) => g.ratingAfter)] : [],
       };
     }),

@@ -7,6 +7,7 @@ import { FriendButton, ProfilePresence } from "@/components/profile/ProfileActio
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
 import { Avatar } from "@/components/ui/Avatar";
 import { PlayerTitle } from "@/components/ui/PlayerTitle";
+import { RankedStatTiles } from "@/components/ui/RankedStatTiles";
 import { Sparkline } from "@/components/ui/Sparkline";
 import { getAccount } from "@/lib/account";
 import { ACHIEVEMENT_BY_ID, ACHIEVEMENTS } from "@/lib/achievements";
@@ -25,7 +26,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 const monthFmt = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
-const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%`);
 
 export default async function ProfilePage({ params }: Params) {
   const { username } = await params;
@@ -74,38 +74,6 @@ export default async function ProfilePage({ params }: Params) {
                 {modes.map((m) => (
                   <RatingCard key={m.mode} summary={m} />
                 ))}
-              </div>
-            </section>
-
-            <section aria-labelledby="stats-heading" className="rounded-xl border border-border bg-surface-primary p-4">
-              <h2 id="stats-heading" className="mb-3 font-display text-[15px] font-semibold">
-                Ranked stats
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-[13px] tabular-nums max-sm:text-[12px]">
-                  <thead>
-                    <tr className="text-left text-[12px] text-text-tertiary">
-                      <th className="pb-2 font-normal">Mode</th>
-                      <th className="pb-2 text-right font-normal">Games</th>
-                      <th className="pb-2 text-right font-normal">Wins</th>
-                      <th className="pb-2 text-right font-normal">Win rate</th>
-                      <th className="pb-2 text-right font-normal">Avg place</th>
-                      <th className="pb-2 text-right font-normal">Top half</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {modes.map((m) => (
-                      <tr key={m.mode} className="border-t border-border">
-                        <td className="py-2 font-medium">{MODES[m.mode].name}</td>
-                        <td className="py-2 text-right">{m.games}</td>
-                        <td className="py-2 text-right">{m.wins}</td>
-                        <td className="py-2 text-right">{pct(m.games ? m.wins / m.games : null)}</td>
-                        <td className="py-2 text-right">{m.avgPlace === null ? "—" : m.avgPlace.toFixed(1)}</td>
-                        <td className="py-2 text-right">{pct(m.topHalfRate)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             </section>
 
@@ -224,6 +192,11 @@ function RatingCard({ summary: m }: { summary: ModeSummary }) {
       <div className="text-[11.5px] tabular-nums text-text-tertiary">
         {placing ? `Placement ${m.games}/${placementGames(m.mode)}` : `Peak ${m.peak} · ${m.games} games`}
       </div>
+      {m.record.games > 0 && (
+        <div className="mt-2">
+          <RankedStatTiles summary={m.record} mode={m.mode} compact brief />
+        </div>
+      )}
     </div>
   );
 }

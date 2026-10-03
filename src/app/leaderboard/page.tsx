@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { EMPTY_SUMMARY, fetchRankedSummaries, formatRate, showsTopHalf, topHalfRate, winRate } from "@/lib/rankedStats";
 import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
 import { PlayerTitle } from "@/components/ui/PlayerTitle";
@@ -34,6 +35,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
     .order("rating", { ascending: false })
     .limit(TOP_TIER_CUT);
   const rows = (data ?? []) as unknown as Row[];
+  const records = await fetchRankedSummaries(supabase, rows.map((r) => r.user_id), mode);
   const mine = account?.ratings.find((r) => r.mode === mode);
 
   return (
@@ -83,6 +85,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
             {rows.map((r, i) => {
               const tier = tierFor(mode, r.rating, r.games, i + 1);
               const isMe = r.user_id === account?.profile.id;
+              const record = records[r.user_id]?.[mode] ?? EMPTY_SUMMARY;
               return (
                 <li key={r.user_id} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? "border-t border-border" : ""} ${isMe ? "bg-gold/[0.06]" : ""}`}>
                   <span className={`w-7 text-center font-display text-[14px] font-semibold tabular-nums ${i < 3 ? "text-gold" : "text-text-tertiary"}`}>{i + 1}</span>
@@ -100,7 +103,9 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
                   <span className="text-[11.5px] font-semibold" style={{ color: tier.color }}>
                     {tier.name}
                   </span>
-                  <span className="w-16 text-right text-[11.5px] text-text-tertiary">{r.games} games</span>
+                  {showsTopHalf(mode) && <RateCell label="Top 4" value={formatRate(topHalfRate(record))} />}
+                  <RateCell label="Win" value={formatRate(winRate(record))} />
+                  <span className="w-16 text-right text-[11.5px] text-text-tertiary max-sm:hidden">{r.games} games</span>
                   <span className="w-14 text-right font-display text-[15px] font-semibold tabular-nums">{r.rating}</span>
                 </li>
               );
@@ -109,5 +114,14 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
         )}
       </div>
     </div>
+  );
+}
+
+function RateCell({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="w-12 text-right leading-tight">
+      <span className="block font-display text-[13.5px] font-semibold tabular-nums">{value}</span>
+      <span className="block text-[10px] text-text-tertiary">{label}</span>
+    </span>
   );
 }
