@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FriendsBadge } from "@/components/friends/FriendsBadge";
 import { AccountBlock } from "@/components/lobby/AccountBlock";
 import { SettingsButton } from "@/components/ui/SettingsDialog";
 import type { Profile } from "@/lib/account";
@@ -29,6 +30,7 @@ export function NavRail({ active = "Play", profile }: { active?: string; profile
               <span className={`w-4 text-center ${isActive ? "text-gold" : "text-text-tertiary"}`}>{item.icon}</span>
               <span className="flex-1">{item.label}</span>
               {!item.live && <span className="text-[10px] text-text-tertiary">Soon</span>}
+              {item.href === "/friends" && profile && <FriendsBadge />}
             </>
           );
           const cls = `flex items-center gap-3 rounded-lg px-2.5 py-2 text-[14px] ${

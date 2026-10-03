@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
+import { RewardPreview } from "@/components/ui/RewardPreview";
 import { MobileTopBar } from "@/components/lobby/MobileTopBar";
 import { NavRail } from "@/components/lobby/NavRail";
 import { getAccount } from "@/lib/account";
 import { type AchievementCategory, ACHIEVEMENTS, rewardName } from "@/lib/achievements";
 import { RARITY } from "@/lib/cosmetics";
+import { getProgressTotals } from "@/lib/progress";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Achievements · Holdemics" };
@@ -15,6 +17,8 @@ const SECTIONS: { id: AchievementCategory; title: string; blurb: string }[] = [
   { id: "domination", title: "Domination", blurb: "Win an 8-player game as the sole chip leader, from earlier and earlier." },
   { id: "bounty", title: "Bounty", blurb: "Be the one who takes the last of their chips." },
   { id: "table", title: "At the table", blurb: "Things that happen in a single game." },
+  { id: "moves", title: "Moves", blurb: "A bluff counts when a player holding the better hand folds to your bet after the flop." },
+  { id: "luck", title: "Luck", blurb: "Equity is measured when the money goes all in with cards still to come." },
   { id: "milestone", title: "Milestones", blurb: "Ranked games played, won, and won in a row." },
   { id: "tier", title: "Tiers", blurb: "Reach a tier in any mode." },
 ];
@@ -23,7 +27,10 @@ export default async function AchievementsPage() {
   const account = await getAccount();
   if (!account) redirect("/login?next=/achievements");
   const supabase = await createClient();
-  const { data } = await supabase.from("player_achievements").select("achievement_id, earned_at").eq("user_id", account.profile.id);
+  const [{ data }, totals] = await Promise.all([
+    supabase.from("player_achievements").select("achievement_id, earned_at").eq("user_id", account.profile.id),
+    getProgressTotals(account.profile.id),
+  ]);
   const earned = new Map((data ?? []).map((r) => [r.achievement_id as string, r.earned_at as string]));
 
   return (
@@ -65,6 +72,10 @@ export default async function AchievementsPage() {
                         {rewardName(a.reward)}
                         {at && <span className="text-gold"> · Earned {new Date(at).toLocaleDateString()}</span>}
                       </div>
+                      {!at && a.progress && <ProgressBar value={totals[a.progress.stat]} target={a.progress.target} color={rarity.color} />}
+                    </div>
+                    <div className="flex w-[92px] shrink-0 items-center justify-center self-stretch border-l border-border pl-3">
+                      <RewardPreview reward={a.reward} titleSize={11} />
                     </div>
                   </li>
                 );
@@ -73,6 +84,20 @@ export default async function AchievementsPage() {
           </section>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ProgressBar({ value, target, color }: { value: number; target: number; color: string }) {
+  const shown = Math.min(value, target);
+  return (
+    <div className="mt-2 flex items-center gap-2" aria-label={`${shown} of ${target}`}>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.07]">
+        <div className="h-full rounded-full" style={{ width: `${(shown / target) * 100}%`, background: color }} />
+      </div>
+      <span className="text-[11px] tabular-nums text-text-tertiary">
+        {shown}/{target}
+      </span>
     </div>
   );
 }

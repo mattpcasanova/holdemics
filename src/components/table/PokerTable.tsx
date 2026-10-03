@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DEAL_STAGGER_MS, type Runout, type Turn } from "@/hooks/usePracticeGame";
 import type { Card } from "@/lib/engine/cards";
@@ -11,6 +11,7 @@ import { TABLE_SKINS } from "@/lib/cosmetics";
 import { noteKey, useNotes } from "@/lib/notes";
 import { useSettings } from "@/lib/settings";
 import { runoutSchedule } from "@/lib/practice/runout";
+import { equities } from "@/lib/handFacts";
 import { play } from "@/lib/audio";
 import {
   BOARD_DEAL_STAGGER_MS,
@@ -187,6 +188,18 @@ export function PokerTable({
   const progress = useRunoutProgress(runout, game.board.length);
   const visibleBoard = game.board.slice(0, progress.faceUp);
   const schedule = runout ? runoutSchedule(runout.from) : null;
+
+  // During an all-in runout every live hand is face up, so show each one's chance of winning
+  // with the cards turned so far. Recomputed as each street lands; gone once the river is out.
+  const faceUp = progress.faceUp;
+  const allInOdds = useMemo(() => {
+    if (!runout || !result?.showdown || faceUp >= 5) return null;
+    const live = Object.keys(result.hands).map(Number);
+    if (live.length < 2) return null;
+    const eq = equities(live.map((i) => game.players[i].holeCards), game.board.slice(0, faceUp), game.handNumber);
+    return Object.fromEntries(live.map((i, k) => [i, eq[k]])) as Record<number, number>;
+  }, [runout, result, faceUp, game.players, game.board, game.handNumber]);
+  const oddsLeader = allInOdds ? Math.max(...Object.values(allInOdds)) : null;
 
   // Side pots only exist once someone is all in; otherwise differing bets are just the current street.
   const anyAllIn = game.players.some((p) => p.allIn && !p.folded);
@@ -381,6 +394,7 @@ export function PokerTable({
                   bigBlind={game.blinds.bb}
                   revealed={showCards}
                   handLabel={handLabel}
+                  odds={allInOdds?.[i] !== undefined ? { value: allInOdds[i], leading: allInOdds[i] === oddsLeader } : null}
                   won={won}
                   handNumber={game.handNumber}
                   tag={notes[noteKey(player)]?.tag}

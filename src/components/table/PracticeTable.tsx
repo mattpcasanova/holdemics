@@ -10,7 +10,7 @@ import { type BotLevel, BOT_LEVELS } from "@/lib/engine/bots";
 import { potTotal } from "@/lib/engine/game";
 import { useUnlocks } from "@/lib/unlocks";
 import { type ModeId, MODES, blindsForLevel, describeLevelLength, formatHp } from "@/lib/engine/modes";
-import { ActionBar } from "./ActionBar";
+import { ACTION_BAR_SLOT, ActionBar } from "./ActionBar";
 import { HandLog } from "./HandLog";
 import { PokerTable } from "./PokerTable";
 import { ResultOverlay } from "./ResultOverlay";
@@ -155,9 +155,9 @@ function PracticeTableInner({ mode, level, onResult, onPlayAgain }: PracticeTabl
               avatars={game.players.map((_, i) => (i === HERO ? unlocks.avatar : null))}
             />
           </div>
-          <div className="mx-auto w-full max-w-[880px] shrink-0">
+          <div className={`relative mx-auto w-full max-w-[880px] shrink-0 ${ACTION_BAR_SLOT}`}>
             {sittingOut && stage === "playing" ? (
-              <div className="flex h-[64px] items-center justify-between gap-3 rounded-xl border border-gold/50 bg-gold/[0.07] px-4 sm:h-[112px]">
+              <div className="flex h-full items-center justify-between gap-3 rounded-xl border border-gold/50 bg-gold/[0.07] px-4">
                 <div>
                   <div className="font-display text-[15px] font-semibold text-gold">You&apos;re sitting out</div>
                   <div className="text-[12px] text-text-secondary">

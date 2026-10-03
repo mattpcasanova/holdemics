@@ -14,9 +14,9 @@ import { potTotal } from "@/lib/engine/game";
 import { MAX_SEATS, MODES, blindsForLevel, describeLevelLength, formatHp } from "@/lib/engine/modes";
 import { type StatsTable, accumulateHand } from "@/lib/stats";
 import { InviteFriends } from "@/components/friends/InviteFriends";
-import { sendInvite } from "@/lib/presence";
+import { announceAchievements, clearActiveTable, sendInvite, setActiveTable } from "@/lib/presence";
 import type { SeatView, TableView } from "@/lib/realtime/protocol";
-import { ActionBar } from "./ActionBar";
+import { ACTION_BAR_SLOT, ActionBar } from "./ActionBar";
 import { HandLog } from "./HandLog";
 import { PokerTable } from "./PokerTable";
 import { ResultOverlay } from "./ResultOverlay";
@@ -42,6 +42,20 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
     const t = setTimeout(clearError, 4000);
     return () => clearTimeout(t);
   }, [error, clearError]);
+
+  // Toast achievements as they arrive (mid-game ones right after the hand that earned them).
+  const myAchievements = view?.viewerId ? view.achievements?.[view.viewerId] : undefined;
+  useEffect(() => {
+    if (myAchievements?.length) announceAchievements(code, myAchievements);
+  }, [code, myAchievements]);
+
+  // While we're still in a game here, other pages show a way back.
+  const stillPlaying = !!view && view.phase === "playing" && view.you !== null && !view.game?.players[view.you]?.eliminated;
+  useEffect(() => {
+    if (!view) return;
+    if (stillPlaying) setActiveTable(code);
+    else clearActiveTable(code);
+  }, [code, view, stillPlaying]);
 
   if (status === "unauthorized") return <Notice title="Sign in to join this table" link={{ href: `/login?next=/table/${code}`, label: "Sign in" }} />;
   if (status === "missing") return <Notice title="This table doesn't exist" body="Check the code with whoever sent it." link={{ href: "/", label: "Back to lobby" }} />;
@@ -213,10 +227,10 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
               />
             )}
           </div>
-          <div className="mx-auto w-full max-w-[880px] shrink-0">
-            {error && <div className="mb-2 rounded-lg border border-red/40 bg-red/10 px-3 py-2 text-[13px] text-[#EFA3A3]">{error}</div>}
+          <div className={`relative mx-auto w-full max-w-[880px] shrink-0 ${ACTION_BAR_SLOT}`}>
+            {error && <div className="absolute inset-x-0 bottom-full z-10 mb-2 rounded-lg border border-red/40 bg-surface-deep px-3 py-2 text-[13px] text-[#EFA3A3]">{error}</div>}
             {heroSeat?.sittingOut && game && game.phase !== "finished" ? (
-              <div className="flex h-[64px] items-center justify-between gap-3 rounded-xl border border-gold/50 bg-gold/[0.07] px-4 sm:h-[112px]">
+              <div className="flex h-full items-center justify-between gap-3 rounded-xl border border-gold/50 bg-gold/[0.07] px-4">
                 <div>
                   <div className="font-display text-[15px] font-semibold text-gold">You&apos;re sitting out</div>
                   <div className="text-[12px] text-text-secondary">Your clock ran out. Until you return, you check when you can and fold to bets.</div>

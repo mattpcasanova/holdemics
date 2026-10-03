@@ -24,7 +24,17 @@ import type {
 } from "@/lib/realtime/protocol";
 import { redactGame } from "@/lib/realtime/view";
 import { ratingChanges } from "@/lib/rating";
-import { type GameFacts, type PlayerTotals, ACHIEVEMENT_BY_ID, gameAchievements, milestoneAchievements } from "@/lib/achievements";
+import {
+  type CareerTotals,
+  type GameFacts,
+  type PlayerTotals,
+  ACHIEVEMENT_BY_ID,
+  careerAchievements,
+  gameAchievements,
+  inGameAchievements,
+  milestoneAchievements,
+} from "@/lib/achievements";
+import { analyzeHand } from "@/lib/handFacts";
 import { STARTING_STACK } from "@/lib/engine/modes";
 import type { Env } from "./index";
 
@@ -92,6 +102,18 @@ interface SeatFacts {
   knockouts: number;
   worstShowdownLoss: number | null;
   survivedAllInShort: boolean;
+  // Optional so games saved before these existed still load.
+  pots72?: number;
+  won72Showdown?: boolean;
+  bluffs?: number;
+  stoneColdBluff?: boolean;
+  biggestBluffPot?: number;
+  shoveBluff?: boolean;
+  allInWins?: number;
+  bestSuckout?: number | null;
+  worstBeat?: number | null;
+  /** Achievement ids already sent for this seat during the game. */
+  awarded?: string[];
 }
 
 const freshFacts = (): SeatFacts => ({
@@ -102,7 +124,19 @@ const freshFacts = (): SeatFacts => ({
   knockouts: 0,
   worstShowdownLoss: null,
   survivedAllInShort: false,
+  pots72: 0,
+  won72Showdown: false,
+  bluffs: 0,
+  stoneColdBluff: false,
+  biggestBluffPot: 0,
+  shoveBluff: false,
+  allInWins: 0,
+  bestSuckout: null,
+  worstBeat: null,
+  awarded: [],
 });
+
+type Award = { user_id: string; achievement_id: string; reward_kind: string; reward_id: string };
 
 const RANKED_START_TIMEOUT_MS = 30_000;
 const EMPTY_SEAT = (): Seat => ({ userId: null, name: "", isBot: false, sittingOut: false, bankMs: 0 });
@@ -424,6 +458,8 @@ export class TableRoom extends DurableObject<Env> {
     const seed = Math.floor(Math.random() * 2 ** 31);
     s.game = createGame({ mode: s.config.mode, seats, seed });
     s.facts = Object.fromEntries(s.seats.map((_, i) => [i, freshFacts()]));
+    // Achievements accumulate over a game (some arrive mid-game), so start each game clean.
+    s.achievements = undefined;
     s.phase = "playing";
     s.step++;
     s.due = { kind: "deal", at: Date.now() + PACE.firstDeal };
@@ -581,7 +617,7 @@ export class TableRoom extends DurableObject<Env> {
     });
   }
 
-  /** At each hand end: knockouts, showdown losses with big hands, all-ins survived. */
+  /** At each hand end: knockouts, showdown losses with big hands, all-ins survived, 7-2 wins, bluffs, all-in luck. */
   private noteHandEnd(g: GameState) {
     const facts = this.state!.facts;
     const r = g.result;
@@ -600,38 +636,108 @@ export class TableRoom extends DurableObject<Env> {
         else if (g.players[seat].allIn && Object.keys(r.hands).some((j) => g.players[Number(j)].totalBet > g.players[seat].totalBet)) f.survivedAllInShort = true;
       }
     }
+    for (const [i, h] of Object.entries(analyzeHand(g))) {
+      const f = facts[Number(i)];
+      if (!f) continue;
+      if (h.won72) f.pots72 = (f.pots72 ?? 0) + 1;
+      if (h.won72Showdown) f.won72Showdown = true;
+      if (h.bluff) {
+        f.bluffs = (f.bluffs ?? 0) + 1;
+        if (h.bluff.beforeRiver && h.bluff.equity <= 0.1) f.stoneColdBluff = true;
+        f.biggestBluffPot = Math.max(f.biggestBluffPot ?? 0, h.bluff.pot);
+        if (h.bluff.allIn) f.shoveBluff = true;
+      }
+      if (h.allInWin) f.allInWins = (f.allInWins ?? 0) + 1;
+      if (h.allIn?.won) f.bestSuckout = Math.min(f.bestSuckout ?? 1, h.allIn.equity);
+      if (h.allIn && !h.allIn.won) f.worstBeat = Math.max(f.worstBeat ?? 0, h.allIn.equity);
+    }
+    this.awardInGame(g);
+  }
+
+  /** Games that can earn achievements: ranked, or private with no bots. */
+  private achievementsCount(): boolean {
+    const s = this.state!;
+    return !!s.facts && (!!s.config.ranked || !s.seats.some((x) => x.isBot));
+  }
+
+  private gameFacts(g: GameState, i: number, place: number): GameFacts {
+    const s = this.state!;
+    const f = s.facts![i];
+    return {
+      mode: s.config.mode,
+      ranked: !!s.config.ranked,
+      players: s.seats.length,
+      place,
+      handsPlayed: g.handNumber,
+      minStack: f.minStack,
+      ledFromFinalFour: f.ledFromFinalFour,
+      ledFromHalf: f.ledFromHalf,
+      ledSinceFirstBust: f.ledSinceFirstBust,
+      knockouts: f.knockouts,
+      worstShowdownLoss: f.worstShowdownLoss,
+      survivedAllInShort: f.survivedAllInShort,
+      pots72: f.pots72 ?? 0,
+      won72Showdown: !!f.won72Showdown,
+      bluffs: f.bluffs ?? 0,
+      stoneColdBluff: !!f.stoneColdBluff,
+      biggestBluffPot: f.biggestBluffPot ?? 0,
+      shoveBluff: !!f.shoveBluff,
+      allInWins: f.allInWins ?? 0,
+      bestSuckout: f.bestSuckout ?? null,
+      worstBeat: f.worstBeat ?? null,
+    };
+  }
+
+  /** Award what a hand just earned (7-2 wins, bluffs, suckouts...) right away, so it can toast mid-game. */
+  private awardInGame(g: GameState) {
+    const s = this.state!;
+    if (!this.achievementsCount() || g.phase === "finished") return;
+    const awards: Award[] = [];
+    s.seats.forEach((seat, i) => {
+      const f = s.facts![i];
+      if (!seat.userId || !f) return;
+      const sent = new Set(f.awarded ?? []);
+      for (const id of inGameAchievements(this.gameFacts(g, i, Number.POSITIVE_INFINITY))) {
+        if (sent.has(id)) continue;
+        const award = this.toAward(seat.userId, id);
+        if (award) awards.push(award);
+        sent.add(id);
+      }
+      f.awarded = [...sent];
+    });
+    if (awards.length) void this.sendAwards(awards);
+  }
+
+  private toAward(userId: string, id: string): Award | null {
+    const reward = ACHIEVEMENT_BY_ID.get(id)?.reward;
+    return reward ? { user_id: userId, achievement_id: id, reward_kind: reward.kind, reward_id: reward.id } : null;
   }
 
   /** Evaluate the rules for every human seat and record what's new. */
   private async awardGameAchievements(g: GameState, totals: Record<string, PlayerTotals>) {
     const s = this.state!;
     if (!s.facts) return;
-    const awards: { user_id: string; achievement_id: string; reward_kind: string; reward_id: string }[] = [];
+    const career = await this.recordGameStats(g);
+    const awards: Award[] = [];
     s.seats.forEach((seat, i) => {
       if (!seat.userId || !s.facts![i]) return;
-      const f = s.facts![i];
-      const gf: GameFacts = {
-        mode: s.config.mode,
-        ranked: !!s.config.ranked,
-        players: s.seats.length,
-        place: g.players[i].place ?? s.seats.length,
-        handsPlayed: g.handNumber,
-        minStack: f.minStack,
-        ledFromFinalFour: f.ledFromFinalFour,
-        ledFromHalf: f.ledFromHalf,
-        ledSinceFirstBust: f.ledSinceFirstBust,
-        knockouts: f.knockouts,
-        worstShowdownLoss: f.worstShowdownLoss,
-        survivedAllInShort: f.survivedAllInShort,
-      };
-      const ids = new Set(gameAchievements(gf));
+      const ids = new Set(gameAchievements(this.gameFacts(g, i, g.players[i].place ?? s.seats.length)));
       const t = totals[seat.userId];
       if (t) for (const id of milestoneAchievements(t, s.config.mode)) ids.add(id);
+      const c = career[seat.userId];
+      if (c) for (const id of careerAchievements(c)) ids.add(id);
+      for (const id of s.facts![i].awarded ?? []) ids.delete(id);
       for (const id of ids) {
-        const reward = ACHIEVEMENT_BY_ID.get(id)?.reward;
-        if (reward) awards.push({ user_id: seat.userId, achievement_id: id, reward_kind: reward.kind, reward_id: reward.id });
+        const award = this.toAward(seat.userId, id);
+        if (award) awards.push(award);
       }
     });
+    await this.sendAwards(awards);
+  }
+
+  /** Record awards; whatever is new for each player is added to `achievements` and broadcast. */
+  private async sendAwards(awards: Award[]) {
+    const s = this.state!;
     if (!awards.length) return;
     try {
       const res = await fetch(`${this.env.SUPABASE_URL}/rest/v1/rpc/award_achievements`, {
@@ -645,12 +751,37 @@ export class TableRoom extends DurableObject<Env> {
       });
       if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
       const fresh = (await res.json()) as Record<string, string[]>;
-      if (Object.keys(fresh).length) s.achievements = fresh;
+      const merged = { ...(s.achievements ?? {}) };
+      for (const [uid, ids] of Object.entries(fresh)) merged[uid] = [...new Set([...(merged[uid] ?? []), ...ids])];
+      s.achievements = merged;
     } catch (err) {
       console.error("achievement write failed", err);
     }
     await this.save();
     this.broadcast();
+  }
+
+  /** Save this game's counted stats per player and return their career totals. Empty on failure. */
+  private async recordGameStats(g: GameState): Promise<Record<string, CareerTotals>> {
+    const s = this.state!;
+    const stats = s.seats.flatMap((seat, i) => (seat.userId && s.facts?.[i] ? [{ user_id: seat.userId, bluffs: s.facts[i].bluffs ?? 0, pots72: s.facts[i].pots72 ?? 0, all_in_wins: s.facts[i].allInWins ?? 0 }] : []));
+    if (!stats.length) return {};
+    try {
+      const res = await fetch(`${this.env.SUPABASE_URL}/rest/v1/rpc/record_game_stats`, {
+        method: "POST",
+        headers: {
+          apikey: this.env.SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${this.env.SUPABASE_PUBLISHABLE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_secret: this.env.TABLE_SERVER_SECRET, p_code: s.config.code, p_game: g.seed, p_stats: stats }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      return (await res.json()) as Record<string, CareerTotals>;
+    } catch (err) {
+      console.error("game stats write failed", err);
+      return {};
+    }
   }
 
   // ─── Views and I/O ───────────────────────────────────────

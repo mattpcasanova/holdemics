@@ -218,3 +218,35 @@ body {
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
+
+/* Title treatments by rarity (see PlayerTitle). Clipped gradients can't take a text-shadow, so they use drop-shadow. */
+.title-epic {
+  background: linear-gradient(90deg, #b48be6, #e89bd0 50%, #b48be6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 6px rgba(180, 139, 230, 0.35));
+}
+.title-legendary {
+  background: linear-gradient(100deg, #c9973f 0%, #f2d38c 40%, #fff6da 50%, #f2d38c 60%, #c9973f 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 8px rgba(229, 185, 106, 0.4));
+  animation: title-shimmer 3.2s linear infinite;
+}
+@keyframes title-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -150% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .title-legendary { animation: none; }
+}
+
+/* Keep page content clear of the fixed mobile tab bar (MobileTabBar). */
+@media (max-width: 767px) {
+  body:has([data-tabbar]) {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+}

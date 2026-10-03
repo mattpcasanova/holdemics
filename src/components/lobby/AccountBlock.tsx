@@ -9,9 +9,13 @@ export function AccountBlock({ profile }: { profile: Profile | null }) {
   if (profile) {
     return (
       <div className="flex items-center gap-2.5 rounded-lg border border-border p-2.5">
-        <Avatar name={profile.username} avatar={profile.avatar} size={32} />
+        <Link href={`/u/${profile.username}`} aria-label="Your profile" className="shrink-0">
+          <Avatar name={profile.username} avatar={profile.avatar} size={32} />
+        </Link>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium">{profile.username}</div>
+          <Link href={`/u/${profile.username}`} className="block truncate text-[13px] font-medium hover:text-gold">
+            {profile.username}
+          </Link>
           <form action={signOut}>
             <button className="text-[11.5px] text-text-tertiary hover:text-text-primary">Sign out</button>
           </form>

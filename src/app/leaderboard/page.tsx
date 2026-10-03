@@ -88,7 +88,13 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
                   <span className={`w-7 text-center font-display text-[14px] font-semibold tabular-nums ${i < 3 ? "text-gold" : "text-text-tertiary"}`}>{i + 1}</span>
                   <Avatar name={r.profiles?.username ?? "?"} avatar={r.profiles?.avatar} size={28} />
                   <span className="min-w-0 flex-1">
-                    <span className={`block truncate text-[13.5px] ${isMe ? "font-medium text-gold" : ""}`}>{r.profiles?.username ?? "unknown"}</span>
+                    {r.profiles ? (
+                      <Link href={`/u/${r.profiles.username}`} className={`block truncate text-[13.5px] hover:underline ${isMe ? "font-medium text-gold" : ""}`}>
+                        {r.profiles.username}
+                      </Link>
+                    ) : (
+                      <span className="block truncate text-[13.5px]">unknown</span>
+                    )}
                     <PlayerTitle id={r.profiles?.title} size={9} />
                   </span>
                   <span className="text-[11.5px] font-semibold" style={{ color: tier.color }}>

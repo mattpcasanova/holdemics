@@ -19,6 +19,12 @@ interface ActionBarProps {
 
 const HALF_HP = UNITS_PER_HP / 2;
 
+/**
+ * The bar's slot is the same height in every state (waiting, check/call, raise
+ * controls, sitting out) so the table above never resizes between decisions.
+ */
+export const ACTION_BAR_SLOT = "h-[158px] sm:h-[112px]";
+
 function roundToHalf(units: number) {
   return Math.round(units / HALF_HP) * HALF_HP;
 }
@@ -114,14 +120,14 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
 
   if (!legal) {
     return (
-      <div className="flex h-[64px] items-center justify-center rounded-xl border border-border bg-surface-deep px-3 text-center text-[13px] text-text-secondary sm:h-[112px]">
+      <div className="flex h-full items-center justify-center rounded-xl border border-border bg-surface-deep px-3 text-center text-[13px] text-text-secondary">
         {idleText}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-felt/50 bg-surface-deep p-2.5 shadow-[0_0_0_1px_rgba(31,111,74,0.25)] sm:h-[112px] sm:flex-row sm:items-stretch sm:gap-3 sm:p-3">
+    <div className="flex h-full flex-col gap-2 rounded-xl border border-felt/50 bg-surface-deep p-2.5 shadow-[0_0_0_1px_rgba(31,111,74,0.25)] sm:flex-row sm:items-stretch sm:gap-3 sm:p-3">
       {clock && (
         <div className="flex shrink-0 items-center justify-center rounded-lg bg-surface-primary max-sm:hidden sm:w-[64px]">
           <ClockReadout clock={clock} />
@@ -187,7 +193,11 @@ export function ActionBar({ legal, pot, currentBet, bigBlind, preflop, onAct, id
         </div>
       )}
 
-      <div className={`flex h-[56px] gap-2 sm:h-auto ${legal.canRaise ? "sm:w-[360px]" : "flex-1"}`}>
+      {!legal.canRaise && (
+        <div className="flex flex-1 items-center justify-center text-[13px] font-medium text-felt-light sm:hidden">Your turn</div>
+      )}
+
+      <div className={`flex h-[56px] shrink-0 gap-2 sm:h-auto ${legal.canRaise ? "sm:w-[360px]" : "sm:flex-1"}`}>
         {clock && !legal.canRaise && (
           <div className="flex w-[52px] shrink-0 items-center justify-center rounded-lg bg-surface-primary sm:hidden">
             <ClockReadout clock={clock} compact />

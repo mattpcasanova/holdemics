@@ -21,6 +21,8 @@ interface SeatProps {
   revealed: Card[] | null;
   /** Current made hand for revealed cards, e.g. "Pair of Sixes". */
   handLabel?: string | null;
+  /** Chance of winning during an all-in runout, and whether it's the best at the table. */
+  odds?: { value: number; leading: boolean } | null;
   won?: { amount: number; hand: string | null };
   handNumber: number;
   clock?: ClockInfo | null;
@@ -31,6 +33,12 @@ interface SeatProps {
   onSelect?: (el: HTMLElement) => void;
   /** Dealer offset and per-card delays for the deal animation. */
   deal?: { dx: number; dy: number; delays: [number, number] };
+}
+
+function formatOdds(value: number): string {
+  if (value > 0 && value < 0.01) return "<1%";
+  if (value < 1 && value > 0.99) return ">99%";
+  return `${Math.round(value * 100)}%`;
 }
 
 function statusText(p: PlayerState, isActing: boolean, isHero: boolean, sittingOut: boolean): { text: string; tone: string } | null {
@@ -65,6 +73,7 @@ export function Seat({
   bigBlind,
   revealed,
   handLabel,
+  odds,
   won,
   handNumber,
   clock,
@@ -139,6 +148,11 @@ export function Seat({
             }`}
           >
             {handLabel}
+            {odds && (
+              <span className={`ml-1.5 border-l border-white/15 pl-1.5 font-bold tabular-nums ${odds.leading ? "text-gold" : "text-text-secondary"}`}>
+                {formatOdds(odds.value)}
+              </span>
+            )}
           </span>
         )}
         {position && !out && !handLabel && (

@@ -6,10 +6,11 @@ import { ChipIcon } from "@/components/table/ChipStack";
 import { PlayingCard } from "@/components/table/PlayingCard";
 import { play } from "@/lib/audio";
 import { SpeakerIcon } from "./SoundToggle";
+import { TablePreview } from "@/components/ui/RewardPreview";
 import { PlayerTitle } from "./PlayerTitle";
 import { ACHIEVEMENT_BY_ID } from "@/lib/achievements";
 import { Avatar } from "./Avatar";
-import { type TableSkin, AVATARS, CARD_BACKS, CHIP_SETS, RARITY, TABLE_SKINS, TITLES, ownedCosmetics } from "@/lib/cosmetics";
+import { AVATARS, CARD_BACKS, CHIP_SETS, RARITY, TABLE_SKINS, TITLES, ownedCosmetics } from "@/lib/cosmetics";
 import type { Card } from "@/lib/engine/cards";
 import { type DeckStyle, settingsStore, useSettings } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/client";
@@ -77,20 +78,6 @@ function Locked({ hint }: { hint: string }) {
     <span className="mt-1 block text-center text-[10.5px] text-text-tertiary" title={hint}>
       🔒 {hint.replace("Unlock: ", "")}
     </span>
-  );
-}
-
-function TablePreview({ skin }: { skin: TableSkin }) {
-  return (
-    <div className="mx-auto h-11 w-[84px] rounded-[50%] p-[4px]" style={{ background: `linear-gradient(180deg, ${skin.rail[0]}, ${skin.rail[1]})` }}>
-      <div
-        className="h-full w-full rounded-[50%]"
-        style={{
-          background: `radial-gradient(ellipse at 50% 40%, ${skin.felt[0]} 0%, ${skin.felt[1]} 35%, ${skin.felt[2]} 72%, ${skin.felt[3]} 100%)`,
-          boxShadow: `inset 0 0 0 1px ${skin.inlay}`,
-        }}
-      />
-    </div>
   );
 }
 

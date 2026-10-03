@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import type { FriendsData } from "@/lib/friends";
-import { describeWhere, useOnline } from "@/lib/presence";
+import { describeWhere, refreshFriendRequests, useFriendsVersion, useOnline } from "@/lib/presence";
 
 export function FriendsPanel({ data }: { data: FriendsData }) {
   const router = useRouter();
@@ -12,6 +13,15 @@ export function FriendsPanel({ data }: { data: FriendsData }) {
   const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+
+  // Reload the lists when a request arrives or is accepted elsewhere.
+  const version = useFriendsVersion();
+  const seenVersion = useRef(version);
+  useEffect(() => {
+    if (version === seenVersion.current) return;
+    seenVersion.current = version;
+    router.refresh();
+  }, [version, router]);
 
   const call = async (body: object, okText?: string) => {
     setBusy(true);
@@ -21,6 +31,7 @@ export function FriendsPanel({ data }: { data: FriendsData }) {
     if (!res.ok) return setNotice({ tone: "error", text: json.error ?? "Something went wrong." });
     if (okText) setNotice({ tone: "ok", text: okText.replace("%s", json.username ?? "") });
     router.refresh();
+    void refreshFriendRequests();
   };
 
   const send = (e: React.FormEvent) => {
@@ -52,7 +63,9 @@ export function FriendsPanel({ data }: { data: FriendsData }) {
                       />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13.5px] font-medium">{f.username}</div>
+                      <Link href={`/u/${f.username}`} className="block truncate text-[13.5px] font-medium hover:text-gold">
+                        {f.username}
+                      </Link>
                       <div className="text-[11.5px] text-text-tertiary">{presence ? describeWhere(presence.where) : "Offline"}</div>
                     </div>
                     <button
@@ -78,7 +91,9 @@ export function FriendsPanel({ data }: { data: FriendsData }) {
               {data.incoming.map((r) => (
                 <li key={r.id} className="flex items-center gap-3">
                   <Avatar name={r.username} avatar={r.avatar} size={28} />
-                  <span className="flex-1 text-[13.5px] font-medium">{r.username}</span>
+                  <Link href={`/u/${r.username}`} className="flex-1 truncate text-[13.5px] font-medium hover:text-gold">
+                    {r.username}
+                  </Link>
                   <button
                     onClick={() => call({ action: "accept", userId: r.id })}
                     disabled={busy}
@@ -128,7 +143,9 @@ export function FriendsPanel({ data }: { data: FriendsData }) {
             <ul className="mt-2 flex flex-col gap-1.5">
               {data.outgoing.map((r) => (
                 <li key={r.id} className="flex items-center gap-2 text-[13px]">
-                  <span className="flex-1 truncate">{r.username}</span>
+                  <Link href={`/u/${r.username}`} className="flex-1 truncate hover:text-gold">
+                    {r.username}
+                  </Link>
                   <span className="text-[11px] text-text-tertiary">pending</span>
                   <button onClick={() => call({ action: "remove", userId: r.id })} disabled={busy} className="text-[12px] text-text-tertiary hover:text-text-primary">
                     Cancel
