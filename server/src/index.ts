@@ -39,6 +39,22 @@ function refuseSocket(msg: QueueServerMessage): Response {
   return new Response(null, { status: 101, webSocket: client });
 }
 
+/**
+ * Close codes the client acts on. A plain HTTP refusal reaches the browser as
+ * an anonymous 1006 close, which looks like a network blip and gets retried
+ * forever, so socket routes always upgrade and then close with one of these.
+ */
+const CLOSE = { unauthorized: 4401, origin: 4403, missing: 4404, refused: 4400 } as const;
+
+function refuse(reason: keyof typeof CLOSE, message: string, context: Record<string, unknown> = {}): Response {
+  console.log(JSON.stringify({ event: "socket_refused", reason, message, ...context }));
+  const [client, server] = Object.values(new WebSocketPair());
+  server.accept();
+  server.send(JSON.stringify({ type: "error", message }));
+  server.close(CLOSE[reason], message.slice(0, 120));
+  return new Response(null, { status: 101, webSocket: client });
+}
+
 function originAllowed(origin: string | null, env: Env): boolean {
   if (!origin) return true; // non-browser clients (test scripts) send no Origin
   return env.ALLOWED_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean).includes(origin);
@@ -54,10 +70,10 @@ export default {
       if (!(mode in MODES)) return json({ error: "Bad mode" }, 400);
       if (request.headers.get("Upgrade") !== "websocket") return json({ error: "Expected a WebSocket" }, 426);
       const origin = request.headers.get("Origin");
-      if (!originAllowed(origin, env)) return json({ error: "Origin not allowed" }, 403);
+      if (!originAllowed(origin, env)) return refuse("origin", "Open Holdemics at holdemics.vercel.app to play.", { origin });
       const token = url.searchParams.get("token") ?? "";
       const who = token ? await identify(token, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY) : null;
-      if (!who || who.anonymous) return json({ error: "Sign in to play ranked" }, 401);
+      if (!who || who.anonymous) return refuse("unauthorized", "Sign in to play ranked.", { route: "queue" });
       // One game at a time: someone still in a game can't queue for another.
       const busyAt = await activeTableOf(env, who.userId);
       if (busyAt) return refuseSocket({ type: "busy", code: busyAt });
@@ -95,10 +111,10 @@ export default {
     if (sub === "ws") {
       if (request.headers.get("Upgrade") !== "websocket") return json({ error: "Expected a WebSocket" }, 426);
       const origin = request.headers.get("Origin");
-      if (!originAllowed(origin, env)) return json({ error: "Origin not allowed" }, 403);
+      if (!originAllowed(origin, env)) return refuse("origin", "Open Holdemics at holdemics.vercel.app to join tables.", { origin, code });
       const token = url.searchParams.get("token") ?? "";
       const who = token ? await identify(token, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY) : null;
-      if (!who) return json({ error: "Sign in to join a table" }, 401);
+      if (!who) return refuse("unauthorized", "Your sign-in couldn't be verified. Sign in again to join.", { code, hasToken: !!token });
       // Pass the verified identity to the room in headers; the token never reaches it.
       const forward = new Request(`${url.origin}/ws`, request);
       forward.headers.set("X-User-Id", who.userId);
@@ -109,7 +125,12 @@ export default {
       const busyAt = await activeTableOf(env, who.userId);
       if (busyAt && busyAt !== code) forward.headers.set("X-Busy-At", busyAt);
       forward.headers.set("X-Table-Code", code);
-      return room.fetch(forward);
+      const res = await room.fetch(forward);
+      if (res.status === 101) return res;
+      // The room said no (no such table, or a ranked table that isn't theirs): pass the reason on.
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      const message = body.error ?? "Couldn't join this table.";
+      return refuse(res.status === 404 ? "missing" : "refused", message, { code, user: who.userId, status: res.status });
     }
 
     return room.fetch(new Request(`${url.origin}/summary`));

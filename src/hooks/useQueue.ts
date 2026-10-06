@@ -43,6 +43,7 @@ export function useQueue(serverWs: string | null) {
         const msg = JSON.parse(e.data as string) as QueueServerMessage;
         if (msg.type === "queued") setState({ status: "searching", since: msg.since, waiting: msg.waiting, window: msg.window });
         if (msg.type === "busy") setState({ status: "busy", code: msg.code });
+        if (msg.type === "error") setState({ status: "error", message: msg.message });
         if (msg.type === "matched") {
           setState({ status: "matched", code: msg.code });
           router.push(`/table/${msg.code}`);
@@ -53,7 +54,7 @@ export function useQueue(serverWs: string | null) {
         if (socket.current !== ws) return;
         socket.current = null;
         setState((s) =>
-          s.status === "matched" || s.status === "busy" ? s : e.code === 4409 ? { status: "error", message: "You joined the queue from another tab." } : { status: "idle" },
+          s.status === "matched" || s.status === "busy" || s.status === "error" ? s : e.code === 4409 ? { status: "error", message: "You joined the queue from another tab." } : { status: "idle" },
         );
       };
       ws.onerror = () => setState({ status: "error", message: "Couldn't reach the matchmaking server." });

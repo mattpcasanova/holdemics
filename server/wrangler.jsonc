@@ -18,5 +18,7 @@
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_M8prsR7oy_yKiDW4QxR9-A_u8jsE_Sh",
     "ALLOWED_ORIGIN": "http://localhost:3100,https://holdemics.vercel.app"
   },
-  "dev": { "port": 8787 }
+  "dev": { "port": 8787 },
+  // Keep request logs and console output so connection problems can be looked up afterwards.
+  "observability": { "enabled": true, "head_sampling_rate": 1 }
 }

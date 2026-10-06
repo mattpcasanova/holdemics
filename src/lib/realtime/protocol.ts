@@ -135,4 +135,6 @@ export type QueueServerMessage =
   | { type: "matched"; code: string }
   /** Refused: the player still has a game running at this table. */
   | { type: "busy"; code: string }
+  /** Refused for another reason (not signed in, wrong site address). */
+  | { type: "error"; message: string }
   | { type: "pong" };

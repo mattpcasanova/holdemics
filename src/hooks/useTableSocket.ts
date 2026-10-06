@@ -7,10 +7,12 @@ import { playEventSounds, playRunoutSounds, playYourTurn } from "@/lib/practice/
 import type { ClientMessage, ServerMessage, TableView } from "@/lib/realtime/protocol";
 import { createClient } from "@/lib/supabase/client";
 
-export type SocketStatus = "connecting" | "open" | "closed" | "unauthorized" | "missing";
+export type SocketStatus = "connecting" | "open" | "closed" | "unauthorized" | "missing" | "refused" | "unreachable";
 
 const PING_MS = 25_000;
 const RECONNECT_MS = [1000, 2000, 4000, 8000];
+/** Attempts that never open before we stop and offer a Retry button instead. */
+const MAX_FAILED_ATTEMPTS = 5;
 
 /**
  * Live connection to a table room. Keeps the latest view, reconnects with
@@ -25,6 +27,8 @@ export function useTableSocket(code: string, serverWs: string) {
   const previous = useRef<TableView | null>(null);
   const attempts = useRef(0);
   const closedByUs = useRef(false);
+  const refreshedToken = useRef(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   const send = useCallback((msg: ClientMessage) => {
     if (socket.current?.readyState === WebSocket.OPEN) socket.current.send(JSON.stringify(msg));
@@ -46,8 +50,9 @@ export function useTableSocket(code: string, serverWs: string) {
       socket.current = ws;
       setStatus("connecting");
 
+      let opened = false;
       ws.onopen = () => {
-        attempts.current = 0;
+        opened = true;
         setStatus("open");
         ping = setInterval(() => send({ type: "ping" }), PING_MS);
       };
@@ -55,6 +60,9 @@ export function useTableSocket(code: string, serverWs: string) {
         const msg = JSON.parse(event.data as string) as ServerMessage;
         if (msg.type === "error") setError(msg.message);
         if (msg.type !== "view") return;
+        // Only a view proves we're really in; a socket that opens and is closed straight away isn't.
+        attempts.current = 0;
+        refreshedToken.current = false;
         cue(previous.current, msg.view);
         previous.current = msg.view;
         setView(msg.view);
@@ -62,8 +70,16 @@ export function useTableSocket(code: string, serverWs: string) {
       ws.onclose = (event) => {
         clearInterval(ping);
         if (closedByUs.current) return;
-        // 1008/4xx-style closes come from the server refusing us; don't hammer it.
-        if (event.code === 1008 || event.code === 4401) {
+        // 4xxx closes are the server refusing us, with the reason in `event.reason`; don't hammer it.
+        if (event.code === 4401 || event.code === 1008) {
+          // Usually a stale access token: refresh once and try again before giving up.
+          if (!refreshedToken.current) {
+            refreshedToken.current = true;
+            void createClient().auth.refreshSession().finally(() => {
+              if (!closedByUs.current) retry = setTimeout(connect, 300);
+            });
+            return;
+          }
           setStatus("unauthorized");
           return;
         }
@@ -71,8 +87,18 @@ export function useTableSocket(code: string, serverWs: string) {
           setStatus("missing");
           return;
         }
+        if (event.code === 4403 || event.code === 4400) {
+          setError(event.reason || "The table server refused the connection.");
+          setStatus("refused");
+          return;
+        }
+        if (!opened || !previous.current) attempts.current++;
+        if (attempts.current >= MAX_FAILED_ATTEMPTS) {
+          setStatus("unreachable");
+          return;
+        }
         setStatus("closed");
-        const delay = RECONNECT_MS[Math.min(attempts.current++, RECONNECT_MS.length - 1)];
+        const delay = RECONNECT_MS[Math.min(attempts.current, RECONNECT_MS.length - 1)];
         retry = setTimeout(connect, delay);
       };
       ws.onerror = () => ws.close();
@@ -85,7 +111,7 @@ export function useTableSocket(code: string, serverWs: string) {
       clearTimeout(retry);
       socket.current?.close();
     };
-  }, [code, serverWs, send]);
+  }, [code, serverWs, send, retryKey]);
 
   const act = useCallback(
     (action: Action) => {
@@ -99,6 +125,11 @@ export function useTableSocket(code: string, serverWs: string) {
   return {
     view,
     status,
+    /** After giving up ("unreachable"), start over. */
+    retry: () => {
+      attempts.current = 0;
+      setRetryKey((k) => k + 1);
+    },
     error,
     clearError: () => setError(null),
     act,

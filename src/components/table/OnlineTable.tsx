@@ -29,7 +29,7 @@ interface OnlineTableProps {
 }
 
 export function OnlineTable({ code, serverWs }: OnlineTableProps) {
-  const { view, status, error, clearError, act, sit, stand, start, addBot, kick, unblock, setSeats, setMod, back } = useTableSocket(code, serverWs);
+  const { view, status, error, clearError, retry, act, sit, stand, start, addBot, kick, unblock, setSeats, setMod, back } = useTableSocket(code, serverWs);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -60,6 +60,17 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
 
   if (status === "unauthorized") return <Notice title="Sign in to join this table" link={{ href: `/login?next=/table/${code}`, label: "Sign in" }} />;
   if (status === "missing") return <Notice title="This table doesn't exist" body="Check the code with whoever sent it." link={{ href: "/", label: "Back to lobby" }} />;
+  if (status === "refused") return <Notice title="Couldn't join this table" body={error ?? undefined} link={{ href: "/", label: "Back to lobby" }} />;
+  if (status === "unreachable") {
+    return (
+      <Notice
+        title="Can't reach the table"
+        body="The connection keeps dropping before the table loads. Check your connection and try again."
+        action={{ label: "Try again", onClick: retry }}
+        link={{ href: "/", label: "Back to lobby" }}
+      />
+    );
+  }
   if (!view) return <Notice title={status === "closed" ? "Reconnecting to the table" : "Joining the table"} />;
 
   const config = MODES[view.config.mode];
@@ -306,16 +317,40 @@ function statsFrom(view: TableView | null): StatsTable {
   return table;
 }
 
-function Notice({ title, body, link }: { title: string; body?: string; link?: { href: string; label: string } }) {
+function Notice({
+  title,
+  body,
+  link,
+  action,
+}: {
+  title: string;
+  body?: string;
+  link?: { href: string; label: string };
+  action?: { label: string; onClick: () => void };
+}) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-3 p-6 text-center">
       <div className="font-display text-[22px] font-semibold">{title}</div>
       {body && <p className="max-w-[40ch] text-[14px] text-text-secondary">{body}</p>}
-      {link && (
-        <Link href={link.href} className="rounded-lg bg-gold px-4 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110">
-          {link.label}
-        </Link>
-      )}
+      <div className="flex gap-2">
+        {action && (
+          <button onClick={action.onClick} className="rounded-lg bg-gold px-4 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110">
+            {action.label}
+          </button>
+        )}
+        {link && (
+          <Link
+            href={link.href}
+            className={
+              action
+                ? "rounded-lg border border-border px-4 py-2.5 text-[14px] text-text-secondary hover:bg-white/5"
+                : "rounded-lg bg-gold px-4 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110"
+            }
+          >
+            {link.label}
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
