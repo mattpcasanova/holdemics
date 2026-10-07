@@ -239,9 +239,10 @@ export function OnlineTable({ code, serverWs }: OnlineTableProps) {
               />
             )}
           </div>
-          <div className={`relative mx-auto w-full max-w-[880px] shrink-0 ${ACTION_BAR_SLOT}`}>
+          {/* The action bar only matters once cards are dealt; the lobby keeps the space. Errors still show above it. */}
+          <div className={`relative mx-auto w-full max-w-[880px] shrink-0 ${game ? ACTION_BAR_SLOT : ""}`}>
             {error && <div className="absolute inset-x-0 bottom-full z-10 mb-2 rounded-lg border border-red/40 bg-surface-deep px-3 py-2 text-[13px] text-[#EFA3A3]">{error}</div>}
-            {heroSeat?.sittingOut && game && game.phase !== "finished" ? (
+            {!game ? null : heroSeat?.sittingOut && game.phase !== "finished" ? (
               <div className="flex h-full items-center justify-between gap-3 rounded-xl border border-gold/50 bg-gold/[0.07] px-4">
                 <div>
                   <div className="font-display text-[15px] font-semibold text-gold">You&apos;re sitting out</div>
@@ -436,151 +437,158 @@ function LobbyTable({
   const cols = total <= 7 ? total : total === 8 ? 4 : 3;
   const btn = "rounded-md border border-border px-2.5 py-1 text-[12px] text-text-secondary transition hover:bg-white/5 hover:text-text-primary disabled:opacity-40 disabled:hover:bg-transparent";
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
-      <div>
-        <div className="font-display text-[26px] font-semibold tracking-tight">Waiting for players</div>
-        <div className="mt-1.5 flex justify-center">
-          {isHost ? (
-            <span className="rounded-full border border-gold/50 bg-gold/10 px-2.5 py-0.5 text-[11.5px] font-semibold text-gold">You&apos;re hosting</span>
-          ) : (
-            <span className="rounded-full border border-border px-2.5 py-0.5 text-[11.5px] text-text-secondary">Hosted by {view.hostName ?? "a friend"}</span>
-          )}
+    // Scrolls when it doesn't fit (phones, big tables); m-auto keeps it centered when it does.
+    <div className="flex h-full overflow-y-auto">
+      <div className="m-auto flex w-full flex-col items-center gap-5 py-2 text-center">
+        <div>
+          <div className="font-display text-[26px] font-semibold tracking-tight max-sm:text-[22px]">Waiting for players</div>
+          <div className="mt-1.5 flex justify-center">
+            {isHost ? (
+              <span className="rounded-full border border-gold/50 bg-gold/10 px-2.5 py-0.5 text-[11.5px] font-semibold text-gold">You&apos;re hosting</span>
+            ) : (
+              <span className="rounded-full border border-border px-2.5 py-0.5 text-[11.5px] text-text-secondary">Hosted by {view.hostName ?? "a friend"}</span>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Access code */}
-      <div className="flex items-stretch overflow-hidden rounded-xl border border-gold/40 bg-surface-deep">
-        <div className="flex flex-col justify-center px-4 py-2.5 text-left">
-          <span className="text-[10.5px] uppercase tracking-wider text-text-tertiary">Table code</span>
-          <span className="font-display text-[26px] font-semibold leading-none tracking-[0.18em] text-gold">{view.config.code}</span>
+        {/* Access code */}
+        <div className="flex items-stretch overflow-hidden rounded-xl border border-gold/40 bg-surface-deep">
+          <div className="flex flex-col justify-center px-4 py-2.5 text-left">
+            <span className="text-[10.5px] uppercase tracking-wider text-text-tertiary">Table code</span>
+            <span className="font-display text-[26px] font-semibold leading-none tracking-[0.18em] text-gold">{view.config.code}</span>
+          </div>
+          <button onClick={onCopy} className="border-l border-gold/30 px-4 text-[12.5px] text-text-secondary transition hover:bg-white/5 hover:text-text-primary" title="Copy invite link">
+            {copied ? "Copied" : "Copy link"}
+          </button>
         </div>
-        <button onClick={onCopy} className="border-l border-gold/30 px-4 text-[12.5px] text-text-secondary transition hover:bg-white/5 hover:text-text-primary" title="Copy invite link">
-          {copied ? "Copied" : "Copy link"}
-        </button>
-      </div>
 
-      <div className="grid justify-center gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 124px)` }}>
-        {view.seats.map((s) => {
-          const kickable = canManage && (s.userId || s.isBot) && !s.isHost && s.index !== you && (!s.isMod || isHost);
-          return (
-            <div key={s.index} className={`relative flex w-[124px] flex-col items-center gap-1.5 rounded-xl border p-3 ${s.userId || s.isBot ? "border-border bg-surface-deep" : "border-dashed border-white/15"}`}>
-              {kickable && (
+        {/* Phones get three columns of narrower cards; wider screens keep rows that divide evenly. */}
+        <div
+          className="grid w-full justify-center gap-2 [grid-template-columns:repeat(var(--cols),124px)] max-sm:[grid-template-columns:repeat(3,minmax(0,1fr))]"
+          style={{ "--cols": cols } as React.CSSProperties}
+        >
+          {view.seats.map((s) => {
+            const kickable = canManage && (s.userId || s.isBot) && !s.isHost && s.index !== you && (!s.isMod || isHost);
+            return (
+              <div key={s.index} className={`relative flex min-w-0 flex-col items-center gap-1.5 rounded-xl border p-3 max-sm:p-2 ${s.userId || s.isBot ? "border-border bg-surface-deep" : "border-dashed border-white/15"}`}>
+                {kickable && (
+                  <button
+                    onClick={() => onKick(s.index)}
+                    aria-label={`Remove ${s.name}`}
+                    title="Remove from table"
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface-primary text-[12px] leading-none text-text-tertiary hover:border-red/50 hover:text-[#EFA3A3]"
+                  >
+                    ×
+                  </button>
+                )}
+                {s.userId ? (
+                  <>
+                    <Avatar name={s.name} avatar={s.avatar} size={36} ring={s.index === you ? "gold" : "none"} />
+                    <span className="max-w-full truncate text-[12px] font-medium">{s.name}</span>
+                    {s.isHost || s.isMod ? <RoleBadge seat={s} /> : <span className="text-[10px] text-text-tertiary">{s.connected ? "Ready" : "Away"}</span>}
+                    {isHost && !s.isHost && (
+                      <span className="flex flex-wrap justify-center gap-x-2 text-[10px] text-text-tertiary">
+                        <button onClick={() => onSetMod(s.userId!, !s.isMod)} className="underline-offset-2 hover:text-text-primary hover:underline">
+                          {s.isMod ? "Remove co-host" : "Make co-host"}
+                        </button>
+                        <button onClick={() => onKick(s.index, true)} title="Remove and don't let them sit again until you invite them back" className="underline-offset-2 hover:text-[#EFA3A3] hover:underline">
+                          Block
+                        </button>
+                      </span>
+                    )}
+                  </>
+                ) : s.isBot ? (
+                  <>
+                    <BotIcon size={36} color={BOT_LEVEL_COLORS[s.botLevel ?? "medium"]} />
+                    <span className="max-w-full truncate text-[12px] font-medium text-text-secondary">{s.name}</span>
+                    <span className="text-[10px]" style={{ color: BOT_LEVEL_COLORS[s.botLevel ?? "medium"] }}>{BOT_LEVELS[s.botLevel ?? "medium"].name} bot</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-9 w-9 rounded-full border border-dashed border-white/20" />
+                    <span className="text-[12px] text-text-tertiary">Open</span>
+                    <span className="text-[10px] text-text-tertiary">&nbsp;</span>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {canManage && open > 0 && (
+          <InviteFriends
+            code={view.config.code}
+            modeId={view.config.mode}
+            seatedIds={[...view.seats.map((s) => s.userId).filter((id): id is string => !!id), ...view.blocked.map((b) => b.userId)]}
+          />
+        )}
+        {isHost && view.blocked.length > 0 && (
+          <div className="flex flex-wrap items-center justify-center gap-2 text-[12px] text-text-tertiary">
+            <span>Blocked:</span>
+            {view.blocked.map((b) => (
+              <span key={b.userId} className="flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5">
+                <span className="text-text-secondary">{b.name}</span>
                 <button
-                  onClick={() => onKick(s.index)}
-                  aria-label={`Remove ${s.name}`}
-                  title="Remove from table"
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface-primary text-[12px] leading-none text-text-tertiary hover:border-red/50 hover:text-[#EFA3A3]"
+                  onClick={async () => {
+                    onUnblock(b.userId);
+                    await sendInvite(b.userId, view.config.code, view.config.mode);
+                  }}
+                  className="text-gold underline-offset-2 hover:underline"
                 >
-                  ×
+                  Invite back
                 </button>
-              )}
-              {s.userId ? (
-                <>
-                  <Avatar name={s.name} avatar={s.avatar} size={36} ring={s.index === you ? "gold" : "none"} />
-                  <span className="max-w-full truncate text-[12px] font-medium">{s.name}</span>
-                  {s.isHost || s.isMod ? <RoleBadge seat={s} /> : <span className="text-[10px] text-text-tertiary">{s.connected ? "Ready" : "Away"}</span>}
-                  {isHost && !s.isHost && (
-                    <span className="flex gap-2 text-[10px] text-text-tertiary">
-                      <button onClick={() => onSetMod(s.userId!, !s.isMod)} className="underline-offset-2 hover:text-text-primary hover:underline">
-                        {s.isMod ? "Remove co-host" : "Make co-host"}
-                      </button>
-                      <button onClick={() => onKick(s.index, true)} title="Remove and don't let them sit again until you invite them back" className="underline-offset-2 hover:text-[#EFA3A3] hover:underline">
-                        Block
-                      </button>
-                    </span>
-                  )}
-                </>
-              ) : s.isBot ? (
-                <>
-                  <BotIcon size={36} color={BOT_LEVEL_COLORS[s.botLevel ?? "medium"]} />
-                  <span className="max-w-full truncate text-[12px] font-medium text-text-secondary">{s.name}</span>
-                  <span className="text-[10px]" style={{ color: BOT_LEVEL_COLORS[s.botLevel ?? "medium"] }}>{BOT_LEVELS[s.botLevel ?? "medium"].name} bot</span>
-                </>
-              ) : (
-                <>
-                  <div className="h-9 w-9 rounded-full border border-dashed border-white/20" />
-                  <span className="text-[12px] text-text-tertiary">Open</span>
-                  <span className="text-[10px] text-text-tertiary">&nbsp;</span>
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {canManage && open > 0 && (
-        <InviteFriends
-          code={view.config.code}
-          modeId={view.config.mode}
-          seatedIds={[...view.seats.map((s) => s.userId).filter((id): id is string => !!id), ...view.blocked.map((b) => b.userId)]}
-        />
-      )}
-      {isHost && view.blocked.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-2 text-[12px] text-text-tertiary">
-          <span>Blocked:</span>
-          {view.blocked.map((b) => (
-            <span key={b.userId} className="flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5">
-              <span className="text-text-secondary">{b.name}</span>
-              <button
-                onClick={async () => {
-                  onUnblock(b.userId);
-                  await sendInvite(b.userId, view.config.code, view.config.mode);
-                }}
-                className="text-gold underline-offset-2 hover:underline"
-              >
-                Invite back
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {canManage && (
-        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-lg border border-border bg-surface-deep px-3 py-2 text-[13px]">
-          <div className="flex items-center gap-1.5">
-            <span className="mr-1 text-text-secondary">Add bot</span>
-            {(Object.keys(BOT_LEVELS) as BotLevel[]).map((level) => (
-              <button key={level} onClick={() => onAddBot(level)} disabled={open === 0} className={btn} title={BOT_LEVELS[level].blurb}>
-                <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ background: BOT_LEVEL_COLORS[level] }} />
-                {BOT_LEVELS[level].name}
-              </button>
+              </span>
             ))}
           </div>
-          {isHost && (
-            <div className="flex items-center gap-1.5">
-              <span className="mr-1 text-text-secondary">Seats</span>
-              <button onClick={() => onSetSeats(total - 1)} disabled={total <= 2 || open === 0} aria-label="Fewer seats" className={`${btn} h-7 w-7 px-0`}>
-                −
-              </button>
-              <span className="w-4 text-center font-display text-[15px] font-semibold tabular-nums">{total}</span>
-              <button onClick={() => onSetSeats(total + 1)} disabled={total >= MAX_SEATS} aria-label="More seats" className={`${btn} h-7 w-7 px-0`}>
-                +
-              </button>
-            </div>
-          )}
-          <span className="text-text-tertiary">{seated} of {total} seats taken</span>
-        </div>
-      )}
+        )}
 
-      <div className="flex gap-2">
-        {you === null ? (
-          <button onClick={onSit} disabled={open === 0} className="rounded-lg bg-gold px-5 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110 disabled:opacity-50">
-            Take a seat
-          </button>
-        ) : (
-          <button onClick={onStand} className="rounded-lg border border-border px-4 py-2.5 text-[13px] text-text-secondary hover:bg-white/5 hover:text-text-primary">
-            Leave seat
-          </button>
+        {canManage && (
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-lg border border-border bg-surface-deep px-3 py-2 text-[13px]">
+            <div className="flex items-center gap-1.5">
+              <span className="mr-1 text-text-secondary">Add bot</span>
+              {(Object.keys(BOT_LEVELS) as BotLevel[]).map((level) => (
+                <button key={level} onClick={() => onAddBot(level)} disabled={open === 0} className={btn} title={BOT_LEVELS[level].blurb}>
+                  <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ background: BOT_LEVEL_COLORS[level] }} />
+                  {BOT_LEVELS[level].name}
+                </button>
+              ))}
+            </div>
+            {isHost && (
+              <div className="flex items-center gap-1.5">
+                <span className="mr-1 text-text-secondary">Seats</span>
+                <button onClick={() => onSetSeats(total - 1)} disabled={total <= 2 || open === 0} aria-label="Fewer seats" className={`${btn} h-7 w-7 px-0`}>
+                  −
+                </button>
+                <span className="w-4 text-center font-display text-[15px] font-semibold tabular-nums">{total}</span>
+                <button onClick={() => onSetSeats(total + 1)} disabled={total >= MAX_SEATS} aria-label="More seats" className={`${btn} h-7 w-7 px-0`}>
+                  +
+                </button>
+              </div>
+            )}
+            <span className="text-text-tertiary">{seated} of {total} seats taken</span>
+          </div>
         )}
-        {isHost && (
-          <button
-            onClick={onStart}
-            disabled={seated < 2}
-            className="rounded-lg bg-felt px-5 py-2.5 font-display text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-50"
-          >
-            Start with {seated} {seated === 1 ? "player" : "players"}
-          </button>
-        )}
+
+        <div className="flex gap-2">
+          {you === null ? (
+            <button onClick={onSit} disabled={open === 0} className="rounded-lg bg-gold px-5 py-2.5 font-display text-[14px] font-semibold text-surface-primary hover:brightness-110 disabled:opacity-50">
+              Take a seat
+            </button>
+          ) : (
+            <button onClick={onStand} className="rounded-lg border border-border px-4 py-2.5 text-[13px] text-text-secondary hover:bg-white/5 hover:text-text-primary">
+              Leave seat
+            </button>
+          )}
+          {isHost && (
+            <button
+              onClick={onStart}
+              disabled={seated < 2}
+              className="rounded-lg bg-felt px-5 py-2.5 font-display text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-50"
+            >
+              Start with {seated} {seated === 1 ? "player" : "players"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { TABLE_SKINS } from "@/lib/cosmetics";
 import { noteKey, useNotes } from "@/lib/notes";
 import { useSettings } from "@/lib/settings";
 import { runoutSchedule } from "@/lib/practice/runout";
+import { type Point, DEALER, STAGES, betPoints, dealerButtonPoint, seatLayout } from "./layout";
 import { equities } from "@/lib/handFacts";
 import { play } from "@/lib/audio";
 import {
@@ -46,71 +47,6 @@ interface PokerTableProps {
   botLabels?: (string | null)[];
   /** Per-seat avatar ids. */
   avatars?: (string | null)[];
-}
-
-type Point = { x: number; y: number };
-
-/**
- * The table is laid out on a fixed-size stage and scaled to fit, so seats,
- * cards, and chips keep their proportions on every screen. Tall, narrow
- * containers (phones) get a portrait stage with seats in two columns.
- */
-const STAGES = {
-  landscape: { w: 1000, h: 640, felt: "9% 7% 12%", boardTop: 45, board: "md" as const },
-  portrait: { w: 540, h: 880, felt: "8% 11% 9%", boardTop: 44, board: "sm" as const },
-};
-const DEALER: Point = { x: 50, y: 40 };
-
-function ellipsePoint(offset: number, seats: number, radius = 1): Point {
-  const angle = ((90 + (offset * 360) / seats) * Math.PI) / 180;
-  return { x: 50 + 44 * radius * Math.cos(angle), y: 51 + 40 * radius * Math.sin(angle) };
-}
-
-const PORTRAIT_8: Point[] = [
-  { x: 50, y: 88 },
-  { x: 15, y: 73 },
-  { x: 15, y: 52 },
-  { x: 15, y: 29 },
-  { x: 50, y: 12 },
-  { x: 85, y: 29 },
-  { x: 85, y: 52 },
-  { x: 85, y: 73 },
-];
-
-/** Seat centers by offset from the hero (0 = hero, then clockwise). */
-function seatLayout(n: number, portrait: boolean): Point[] {
-  if (!portrait) return Array.from({ length: n }, (_, k) => ellipsePoint(k, n));
-  if (n === 2) return [PORTRAIT_8[0], PORTRAIT_8[4]];
-  if (n === 8) return PORTRAIT_8;
-  return Array.from({ length: n }, (_, k) => {
-    const a = ((90 + (k * 360) / n) * Math.PI) / 180;
-    return { x: 50 + 36 * Math.cos(a), y: 50 + 38 * Math.sin(a) };
-  });
-}
-
-/**
- * Where a seat's bet sits, relative to the seat box so chips clear both the
- * seat and the board.
- */
-function betPoint(seat: Point, isHero: boolean, portrait: boolean): Point {
-  if (isHero) return { x: 50, y: portrait ? 71 : 68.5 };
-  const toward = Math.sign(50 - seat.x);
-  if (portrait) {
-    if (Math.abs(seat.x - 50) < 10) return { x: seat.x, y: seat.y + 12 };
-    // Middle side seats sit level with the pot, so drop their bets just below it.
-    return { x: seat.x + toward * 22, y: seat.y + (Math.abs(seat.y - 52) < 5 ? 8 : 0) };
-  }
-  const dy = seat.y - 51;
-  if (Math.abs(dy) < 12) return { x: seat.x + toward * 14, y: seat.y };
-  if (dy < 0) return { x: seat.x + toward * 5, y: seat.y + 14 };
-  return { x: seat.x + toward * 13, y: seat.y - 9 };
-}
-
-function dealerButtonPoint(seat: Point, offset: number, n: number, portrait: boolean): Point {
-  if (!portrait) return ellipsePoint(offset + 0.32, n, 0.7);
-  // Just inside the seat box, toward the middle of the table.
-  if (Math.abs(seat.x - 50) < 10) return { x: seat.x + 19, y: seat.y + (seat.y < 50 ? 6 : -6) };
-  return { x: seat.x + Math.sign(50 - seat.x) * 18, y: seat.y - 6 };
 }
 
 /**
@@ -183,6 +119,7 @@ export function PokerTable({
 
   const n = game.players.length;
   const layout = seatLayout(n, portrait);
+  const bets = betPoints(n, portrait);
   const labels = positionLabels(game);
   const result = game.phase === "complete" || game.phase === "finished" ? game.result : null;
   const progress = useRunoutProgress(runout, game.board.length);
@@ -324,7 +261,7 @@ export function PokerTable({
           const offset = (i - heroIndex + n) % n;
           const seat = layout[offset];
           const isHero = i === heroIndex;
-          const bet = betPoint(seat, isHero, portrait);
+          const bet = bets[offset];
           const dealer = dealerButtonPoint(seat, offset, n, portrait);
 
           if (i >= seatedCount) {
